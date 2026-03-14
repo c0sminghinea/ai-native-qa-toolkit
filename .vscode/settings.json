@@ -1,0 +1,7 @@
+{
+  "cSpell.enabled": true,
+  "editor.spellCheck": true,
+  "workbench.colorCustomizations": {
+    "editorError.foreground": "#00000000"
+  }
+}

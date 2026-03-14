@@ -1,0 +1,34 @@
+{
+  "name": "qa-playwright",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:report": "playwright show-report",
+    "build": "tsc",
+    "lint": "tsc --noEmit",
+    "visual-regression": "tsx ai-tools/visual-regression.ts",
+    "analyze-failure": "tsx ai-tools/analyze-failure.ts",
+    "mcp-server": "tsx mcp-server.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^25.5.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "@playwright/mcp": "^0.0.68",
+    "dotenv": "^17.3.1",
+    "groq-sdk": "^1.1.1"
+  }
+}

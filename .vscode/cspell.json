@@ -1,0 +1,18 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "Groq",
+    "groq",
+    "playwright",
+    "testid",
+    "data-testid",
+    "js",
+    "Åke",
+    "Jönsson"
+  ],
+  "ignorePaths": [
+    "node_modules/**",
+    "*.log"
+  ]
+}
