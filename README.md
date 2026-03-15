@@ -19,7 +19,7 @@ Built against the cal.com open-source scheduling platform as a real-world target
           │                          │                          │
    ┌──────▼──────┐          ┌────────▼────────┐         ┌───────▼───────┐
    │  AI Tools   │          │  Playwright E2E │         │  Autonomous   │
-   │  (7 tools)  │          │  Test Suite     │         │  Agent        │
+   │  (8 tools)  │          │  Test Suite     │         │  Agent        │
    └──────┬──────┘          └────────┬────────┘         └───────┬───────┘
           │                          │                          │
    ┌──────▼──────────────────────────▼──────────────────────────▼───────┐
@@ -42,6 +42,7 @@ qa-playwright/
     persona-engine.ts       # Synthetic persona engine for edge case testing
     visual-regression.ts      # AI vision analysis across desktop, tablet, and mobile
     data-consistency.ts       # Verify data integrity across marketplace pages
+    cdp-inspector.ts          # Browser protocol debugging via CDP session
   tests/
     pages/
       BookingPage.ts        # Page Object Model for cal.com booking page
@@ -55,6 +56,7 @@ qa-playwright/
   agent-report.md           # Latest autonomous agent report
   visual-regression-report.md  # Latest visual regression report
   data-consistency-report.md   # Latest data consistency report
+  cdp-report.md                # Latest CDP inspector report
   mcp-server.ts                # MCP server exposing all tools to LLM clients
   mcp-config.json              # MCP client configuration for Claude Code/Cursor
 ```
@@ -281,6 +283,37 @@ In a C2C platform, data inconsistency between pages is a trust and conversion is
 - Rating on listing ≠ rating on profile → erodes trust in the platform
 
 Output: `data-consistency-report.md`
+
+---
+
+### 8. CDP Inspector
+
+Opens a direct Chrome DevTools Protocol (CDP) session on any page — capturing
+all network requests, API calls, console warnings, and JavaScript exceptions
+at the browser protocol level. Sends findings to AI for analysis.
+```bash
+# Default URL
+npx tsx ai-tools/cdp-inspector.ts
+
+# Custom URL
+npx tsx ai-tools/cdp-inspector.ts https://cal.com/bailey/chat
+```
+
+**Real findings from a test run against cal.com:**
+
+- 77 network requests captured on a single booking page load
+- 8 API/tRPC calls identified including `slots/getSchedule`
+- Zustand deprecation warning detected — `create` should be `createWithEqualityFn`
+- i18next configuration warning — internationalization may not function correctly
+  across all locales (corroborated by persona engine French locale finding)
+- `markdownToSafeHTML` client-side import warning — potential security concern
+
+> **Why this matters:** These findings are invisible to standard Playwright tests.
+> CDP exposes what's happening at the browser protocol level — the same layer
+> the Chrome DevTools inspector uses — giving QA engineers direct access to
+> network traffic, runtime exceptions, and console output during any user flow.
+
+Output: `cdp-report.md`
 
 ---
 
