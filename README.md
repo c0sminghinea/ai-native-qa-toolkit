@@ -59,6 +59,8 @@ qa-playwright/
   cdp-report.md                # Latest CDP inspector report
   mcp-server.ts                # MCP server exposing all tools to LLM clients
   mcp-config.json              # MCP client configuration for Claude Code/Cursor
+  mcp-playwright-demo.ts       # Official @playwright/mcp server demo — LLM-controlled browser
+  playwright-mcp-report.md     # Latest Playwright MCP session report
 ```
 
 ---
@@ -356,6 +358,46 @@ QA toolkit becomes available as native tools in the terminal:
 
 Add the contents of `mcp-config.json` to Cursor's MCP settings under
 Settings → MCP Servers.
+
+---
+
+## Playwright MCP Integration
+
+Demonstrates the official `@playwright/mcp` server — the same protocol
+Claude Code uses to control browsers in agentic workflows. An LLM connects
+to the MCP server, receives an accessibility snapshot of the page, and
+controls the browser using element reference IDs rather than CSS selectors.
+
+```bash
+npx tsx mcp-playwright-demo.ts
+```
+
+**How it works:**
+
+1. Starts the official `@playwright/mcp` server (22 browser control tools)
+2. Initializes a JSON-RPC 2.0 MCP connection
+3. Calls `browser_navigate` to open the target URL
+4. Calls `browser_snapshot` to capture the accessibility tree
+5. Sends the snapshot to an LLM for analysis
+6. LLM proposes the next action using MCP element reference IDs
+
+**Real session output:**
+
+> The MCP server exposed 22 tools including `browser_navigate`,
+> `browser_snapshot`, `browser_click`, `browser_fill_form`, and
+> `browser_evaluate`. After navigating to cal.com/bailey/chat and capturing
+> the accessibility snapshot, the AI identified the "View next month" button
+> by its MCP reference ID (`ref=e49`) and proposed clicking it to verify
+> calendar navigation — without any hardcoded selectors.
+
+**Why this matters:**
+
+This is the difference between *writing Playwright scripts* and *using
+Playwright as an MCP server*. The LLM reasons about the accessibility tree
+and controls the browser dynamically — the same architecture Holidog likely
+uses with their internal AI-based QA tooling.
+
+Output: `playwright-mcp-report.md`
 
 ---
 
