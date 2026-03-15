@@ -43,6 +43,8 @@ qa-playwright/
     visual-regression.ts      # AI vision analysis across desktop, tablet, and mobile
     data-consistency.ts       # Verify data integrity across marketplace pages
     cdp-inspector.ts          # Browser protocol debugging via CDP session
+  docs/
+    cal-com-qa-audit.md     # Full QA audit of cal.com codebase
   tests/
     pages/
       BookingPage.ts        # Page Object Model for cal.com booking page
@@ -61,6 +63,7 @@ qa-playwright/
   mcp-config.json              # MCP client configuration for Claude Code/Cursor
   mcp-playwright-demo.ts       # Official @playwright/mcp server demo — LLM-controlled browser
   playwright-mcp-report.md     # Latest Playwright MCP session report
+  cli.ts                       # Unified CLI — run all tools with: npx tsx cli.ts <command>
 ```
 
 ---
@@ -404,6 +407,36 @@ Output: `playwright-mcp-report.md`
 
 ---
 
+## CLI
+
+All tools are accessible through a single unified command:
+
+```bash
+npx tsx cli.ts <command> [options]
+```
+
+| Command | What it does |
+| --- | --- |
+| `generate <url>` | Generate Playwright tests from a URL |
+| `analyze` | Analyze a test failure and get a fix |
+| `coverage` | Score test coverage and get missing tests |
+| `visual <url>` | AI vision analysis across viewports |
+| `agent <goal> <url>` | Autonomous browser agent |
+| `personas` | Synthetic persona engine |
+| `consistency` | Data consistency checker |
+| `cdp <url>` | CDP browser protocol inspector |
+| `mcp <url>` | Playwright MCP server demo |
+| `test` | Run the full Playwright test suite |
+| `report` | Open the Playwright trace viewer |
+
+```bash
+# Examples
+npx tsx cli.ts generate https://cal.com/bailey/chat
+npx tsx cli.ts visual https://cal.com/bailey/chat
+npx tsx cli.ts agent "verify booking flow" https://cal.com/bailey/chat
+npx tsx cli.ts test
+```
+
 ## Setup
 
 ### Prerequisites
@@ -439,6 +472,7 @@ This toolkit runs entirely on free tier APIs and open-source models:
 | Browser Automation | Playwright | Open source |
 | MCP Orchestration | @modelcontextprotocol/sdk | Open source |
 | Test Runner | Vitest + Playwright | Open source |
+| Playwright MCP | @playwright/mcp | Open source |
 
 The AI-first approach means zero onboarding time on new codebases — the
 toolkit reads, maps, and tests any repository autonomously from day one.
@@ -499,9 +533,12 @@ npx playwright show-report
 
 ## About
 
-Built as a practical demonstration of AI-native QA engineering — an autonomous
+This project is built as a practical demonstration of AI-native QA engineering - an autonomous
 ecosystem that generates, executes, diagnoses, and improves tests using LLM
 inference at every layer of the QA workflow.
 
 The approach: AI handles the repetitive and exploratory work; the engineer
 focuses on judgment, verification, and strategy.
+
+A full QA audit of the cal.com codebase is available in [`docs/cal-com-qa-audit.md`](docs/cal-com-qa-audit.md) —
+demonstrating autonomous codebase exploration, risk analysis, and test strategy proposal.
