@@ -304,17 +304,20 @@ npx tsx ai-tools/cdp-inspector.ts https://cal.com/bailey/chat
 
 **Real findings from a test run against cal.com:**
 
-- 77 network requests captured on a single booking page load
+- 75 network requests captured on a single booking page load
 - 8 API/tRPC calls identified including `slots/getSchedule`
+- 2 requests intercepted via `Fetch.enable` CDP domain — `auth/session` and `slots/getSchedule`
+- `slots/getSchedule` mocked with empty response to test UI resilience under no-availability condition
 - Zustand deprecation warning detected — `create` should be `createWithEqualityFn`
 - i18next configuration warning — internationalization may not function correctly
   across all locales (corroborated by persona engine French locale finding)
 - `markdownToSafeHTML` client-side import warning — potential security concern
 
 > **Why this matters:** These findings are invisible to standard Playwright tests.
-> CDP exposes what's happening at the browser protocol level — the same layer
-> the Chrome DevTools inspector uses — giving QA engineers direct access to
-> network traffic, runtime exceptions, and console output during any user flow.
+> CDP exposes what's happening at the browser protocol level — enabling not just
+> passive observation of network traffic, but active interception and mocking of
+> API responses without touching application code. This is how you test edge cases
+> like "what happens when the slots API returns empty?" in a real browser context.
 
 Output: `cdp-report.md`
 
