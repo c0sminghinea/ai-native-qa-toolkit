@@ -43,6 +43,45 @@ async function inspectWithCDP(url: string) {
   await cdpSession.send('Console.enable');
   await cdpSession.send('Runtime.enable');
 
+  // Enable request interception via CDP
+  await cdpSession.send('Fetch.enable', {
+    patterns: [
+      { urlPattern: '*/api/trpc/slots*', requestStage: 'Request' },
+      { urlPattern: '*/api/auth/session*', requestStage: 'Request' }
+    ]
+  });
+
+  let interceptedRequests = 0;
+  const interceptedLog: string[] = [];
+
+  // Intercept and optionally mock API responses
+  cdpSession.on('Fetch.requestPaused', async (params) => {
+    interceptedRequests++;
+    const url = params.request.url;
+    interceptedLog.push(`Intercepted: ${params.request.method} ${url.substring(0, 80)}`);
+
+    // Mock the slots API to return empty availability
+    // This tests whether the UI handles "no available slots" gracefully
+    if (url.includes('slots/getSchedule') && interceptedRequests === 1) {
+      interceptedLog.push('→ Mocking empty slots response to test UI resilience');
+      await cdpSession.send('Fetch.fulfillRequest', {
+        requestId: params.requestId,
+        responseCode: 200,
+        responseHeaders: [
+          { name: 'content-type', value: 'application/json' }
+        ],
+        body: Buffer.from(JSON.stringify({
+          result: { data: { json: { slots: {} } } }
+        })).toString('base64')
+      });
+    } else {
+      // Pass all other requests through normally
+      await cdpSession.send('Fetch.continueRequest', {
+        requestId: params.requestId
+      });
+    }
+  });
+
   // Capture all network requests via CDP
   cdpSession.on('Network.requestWillBeSent', (params) => {
     networkRequests.push({
@@ -98,6 +137,11 @@ async function inspectWithCDP(url: string) {
   await browser.close();
 
   // Analyze findings
+  console.log(`\n🔀 Request Interception Results:`);
+  console.log(`   Requests intercepted: ${interceptedRequests}`);
+  interceptedLog.forEach(l => console.log(`   ${l}`));
+  console.log();
+
   const apiRequests = networkRequests.filter(r =>
     r.url.includes('/api/') ||
     r.url.includes('trpc') ||
@@ -201,6 +245,9 @@ ${apiRequests.map(r => `- \`${r.method}\` ${r.url} [${r.status || 'pending'}]`).
 
 ## Errors
 ${errors.map(e => `- ${e}`).join('\n') || 'No errors detected'}
+
+## Request Interception
+${interceptedLog.map(l => `- ${l}`).join('\n') || 'No requests intercepted'}
 
 ## AI Analysis
 ${analysis}
