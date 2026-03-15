@@ -291,6 +291,7 @@ Output: `data-consistency-report.md`
 Opens a direct Chrome DevTools Protocol (CDP) session on any page — capturing
 all network requests, API calls, console warnings, and JavaScript exceptions
 at the browser protocol level. Sends findings to AI for analysis.
+
 ```bash
 # Default URL
 npx tsx ai-tools/cdp-inspector.ts
