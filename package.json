@@ -21,6 +21,7 @@
     "data-consistency": "tsx ai-tools/data-consistency.ts",
     "generate-tests": "tsx ai-tools/generate-tests.ts",
     "persona-engine": "tsx ai-tools/persona-engine.ts",
+    "heal-locator": "tsx ai-tools/locator-healer.ts",
     "mcp-server": "tsx mcp-server.ts",
     "test:ai-generated": "RUN_AI_GENERATED=1 playwright test tests/ai-generated.spec.ts --project=chromium",
     "test:chromium": "playwright test --project=chromium",
