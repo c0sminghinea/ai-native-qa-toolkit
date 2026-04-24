@@ -1,12 +1,7 @@
-import * as dotenv from 'dotenv';
-import Groq from 'groq-sdk';
+import { groqChat, MODELS } from './groq-client';
+import { ensureDir, parseAIJson, saveReport, sleep, DEFAULT_TARGET_URL } from './tool-utils';
 import { chromium } from '@playwright/test';
-import * as fs from 'fs';
 import * as path from 'path';
-
-dotenv.config();
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 interface Persona {
   name: string;
@@ -17,11 +12,30 @@ interface Persona {
   expectedRisk: 'low' | 'medium' | 'high';
 }
 
+function safeTimezoneId(timezone: string): string {
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: timezone });
+    return timezone;
+  } catch {
+    return 'UTC';
+  }
+}
+
+function timezoneToLocale(timezone: string): string {
+  if (timezone.startsWith('America')) return 'en-US';
+  if (timezone.startsWith('Europe')) return 'en-GB';
+  if (timezone.startsWith('Australia')) return 'en-AU';
+  if (timezone.startsWith('Pacific')) return 'en-NZ';
+  if (timezone.startsWith('Africa')) return 'en-ZA';
+  if (timezone.startsWith('Asia')) return 'en-IN';
+  return 'en-US';
+}
+
 async function generatePersonas(): Promise<Persona[]> {
   console.log('🧠 Generating edge case personas...\n');
 
-  const result = await groq.chat.completions.create({
-    model: 'llama-3.3-70b-versatile',
+  const result = await groqChat({
+    model: MODELS.text,
     messages: [
       {
         role: 'system',
@@ -58,14 +72,7 @@ Make personas diverse and realistic. Include cases like:
     ]
   });
 
-  const raw = result.choices[0].message.content!.trim();
-  try {
-    return JSON.parse(raw);
-  } catch {
-    const match = raw.match(/\[[\s\S]*\]/);
-    if (match) return JSON.parse(match[0]);
-    throw new Error('Could not parse personas JSON');
-  }
+  return parseAIJson<Persona[]>(result.choices[0].message.content!, '[');
 }
 
 async function testPersona(persona: Persona, index: number): Promise<{
@@ -82,15 +89,15 @@ async function testPersona(persona: Persona, index: number): Promise<{
 
   const browser = await chromium.launch({ headless: true });
 
-  const safeTimezone = persona.timezone.match(/^[A-Za-z]+\/[A-Za-z_]+$/)
-    ? persona.timezone
-    : 'UTC';
+  const safeTimezone = safeTimezoneId(persona.timezone);
+
+  // Determine viewport from the persona's described edge case, not from index position
+  const isMobile = /mobile|smartphone|small.?screen/i.test(`${persona.edgeCase} ${persona.scenario}`);
 
   const context = await browser.newContext({
     timezoneId: safeTimezone,
-    locale: persona.timezone.startsWith('America') ? 'en-US' :
-            persona.timezone.startsWith('Europe') ? 'en-GB' : 'en-US',
-    viewport: index % 3 === 0 ? { width: 375, height: 812 } : { width: 1280, height: 720 }
+    locale: timezoneToLocale(safeTimezone),
+    viewport: isMobile ? { width: 375, height: 812 } : { width: 1280, height: 720 }
   });
 
   const page = await context.newPage();
@@ -99,13 +106,11 @@ async function testPersona(persona: Persona, index: number): Promise<{
   let passed = true;
 
   const screenshotsDir = path.join(process.cwd(), 'persona-screenshots');
-  if (!fs.existsSync(screenshotsDir)) fs.mkdirSync(screenshotsDir);
+  ensureDir(screenshotsDir);
   const screenshotPath = path.join(screenshotsDir, `persona-${index + 1}.png`);
-  const viewport = context.browser()?.contexts()[0] ? 
-    { width: 1280, height: 720 } : { width: 375, height: 812 };
 
   try {
-    await page.goto('https://cal.com/bailey/chat', { timeout: 15000 });
+    await page.goto(DEFAULT_TARGET_URL, { timeout: 15000 });
     findings.push('✅ Page loaded successfully');
 
     // Check event title
@@ -129,9 +134,15 @@ async function testPersona(persona: Persona, index: number): Promise<{
       }
     }
 
-    // Check calendar rendered
-    const calendarVisible = await page.getByText('March').isVisible().catch(() => false) ||
-                            await page.getByText('April').isVisible().catch(() => false);
+    // Check calendar rendered — use current and following month so the check
+    // stays correct regardless of when this runs
+    const now = new Date();
+    const currentMonthName = now.toLocaleString('en-US', { month: 'long' });
+    const nextMonthName = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+      .toLocaleString('en-US', { month: 'long' });
+    const calendarVisible =
+      await page.getByText(currentMonthName).isVisible().catch(() => false) ||
+      await page.getByText(nextMonthName).isVisible().catch(() => false);
     if (calendarVisible) {
       findings.push('✅ Calendar rendered correctly');
     } else {
@@ -140,9 +151,9 @@ async function testPersona(persona: Persona, index: number): Promise<{
 
     // Click a date and check time slots
     await dateButton.click({ timeout: 3000 }).catch(() => null);
-    await page.waitForTimeout(1000);
+    await sleep(1000);
 
-    const timeSlotsVisible = await page.getByText('12h').isVisible().catch(() => false);
+    const timeSlotsVisible = await page.getByTestId('time').first().isVisible({ timeout: 5000 }).catch(() => false);
     if (timeSlotsVisible) {
       findings.push('✅ Time slots rendered after date selection');
     } else {
@@ -163,8 +174,8 @@ async function testPersona(persona: Persona, index: number): Promise<{
 
     // Ask AI to analyse the page for additional friction points
     const pageText = await page.evaluate(() => document.body.innerText.substring(0, 1500));
-    const aiAnalysis = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+    const aiAnalysis = await groqChat({
+      model: MODELS.text,
       messages: [
         {
           role: 'system',
@@ -172,9 +183,9 @@ async function testPersona(persona: Persona, index: number): Promise<{
         },
         {
           role: 'user',
-          content: `This persona is testing a booking page: "${persona.scenario}"
-          Edge case: "${persona.edgeCase}"
-          Viewport: ${index % 3 === 0 ? '375x812 (mobile)' : '1280x720 (desktop)'}
+          content: `This persona is testing a booking page: "${persona.scenario.substring(0, 200)}"
+          Edge case: "${persona.edgeCase.substring(0, 200)}"
+          Viewport: ${isMobile ? '375x812 (mobile)' : '1280x720 (desktop)'}
           Timezone: ${safeTimezone}
           Page content:
           ${pageText}
@@ -267,11 +278,25 @@ ${results.filter(r => !r.passed).length === 0
 ---
 *Generated by AI-Native QA Toolkit — Synthetic Persona Engine*`;
 
-  const reportPath = path.join(process.cwd(), 'persona-report.md');
-  fs.writeFileSync(reportPath, report);
-  console.log(`\n📄 Full report saved to: persona-report.md`);
+  saveReport('persona-report.md', report);
   console.log(`📸 Screenshots saved to: persona-screenshots/`);
   console.log(`\n✅ ${passed}/${results.length} personas passed`);
+}
+
+async function runWithConcurrency<T>(
+  tasks: (() => Promise<T>)[],
+  concurrency: number
+): Promise<T[]> {
+  const results: T[] = new Array(tasks.length);
+  let nextIndex = 0;
+  async function worker() {
+    while (nextIndex < tasks.length) {
+      const index = nextIndex++;
+      results[index] = await tasks[index]();
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, worker));
+  return results;
 }
 
 async function runPersonaEngine() {
@@ -284,16 +309,9 @@ async function runPersonaEngine() {
     console.log(`${i + 1}. ${p.name} — ${p.edgeCase} [${p.expectedRisk.toUpperCase()}]`);
   });
 
-  console.log('\n🚀 Running persona tests...');
-  const results: Awaited<ReturnType<typeof testPersona>>[] = [];
-
-  // Run personas sequentially to avoid overwhelming the server
-  for (let i = 0; i < personas.length; i++) {
-    const result = await testPersona(personas[i], i);
-    results.push(result);
-    // Small delay between personas
-    await new Promise(r => setTimeout(r, 1000));
-  }
+  console.log('\n🚀 Running persona tests (3 concurrent)...');
+  const tasks = personas.map((_p, i) => () => testPersona(personas[i], i));
+  const results = await runWithConcurrency(tasks, 3);
 
   await generateReport(results);
 }

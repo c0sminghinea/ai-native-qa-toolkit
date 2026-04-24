@@ -1,7 +1,7 @@
 # AI Visual Regression Report
 
 **URL Tested:** https://cal.com/bailey/chat  
-**Date:** 2026-03-14  
+**Date:** 2026-04-24  
 **Tool:** Groq Vision (meta-llama/llama-4-scout-17b-16e-instruct)
 
 ---
@@ -10,9 +10,9 @@
 
 | Viewport | Score | Screenshot |
 |---|---|---|
-| Desktop (1280x720) | 7/10 | visual-regression/desktop.png |
-| Tablet (768x1024) | 8/10 | visual-regression/tablet.png |
-| Mobile (375x812) | 7/10 | visual-regression/mobile.png |
+| Desktop (1280x720) | 8/10 | visual-regression/desktop.png |
+| Tablet (768x1024) | 7/10 | visual-regression/tablet.png |
+| Mobile (375x812) | 6/10 | visual-regression/mobile.png |
 
 ---
 
@@ -21,66 +21,67 @@
 
 ### Desktop (1280x720)
 
-**LAYOUT:** 
-The layout appears to be mostly well-structured. The calendar interface is clear, with a visible date selection area and time slots on the right. However, the left sidebar, which seems to contain booking details and options (e.g., "Requires confirmation", "15m", "Google Meet", "Europe/Bucharest"), is partially cut off at this screen size. The key elements are mostly visible but could benefit from a more responsive design to ensure everything fits well within the viewport.
+**LAYOUT**: 
+The layout appears to be well-structured, with clear sections for the calendar, meeting details, and time slots. However, the calendar view and time slots seem to be truncated on the right side, potentially causing issues with usability. The key elements, such as the calendar, meeting duration (15m), and Google Meet information, are visible. 
 
-**CTA VISIBILITY:** 
-The primary call-to-action (CTA), which would typically involve selecting a date and time or proceeding with the booking, seems somewhat accessible. The time slots for Friday, the 20th, are visible without needing to scroll. However, it's unclear if there's a clear "Book" or "Confirm" button visible without scrolling, as the focus seems to be on date and time selection.
+**CTA VISIBILITY**: 
+The primary call-to-action (CTA) seems to be selecting a date and time slot. The calendar view allows users to select a date, but the "Book" or "Select Date" button is not explicitly visible in the provided screenshot. However, assuming the CTA is to select a date and time, it appears that users can do so without scrolling.
 
-**READABILITY:** 
-The text is generally legible. The font sizes and styles used for the days of the week (MON, TUE, WED, etc.), date numbers, and sidebar information appear to be clear and readable. There doesn't seem to be any overlapping text.
+**READABILITY**: 
+The text is legible, with clear labels for the days of the week, dates, and time slots. The font sizes and styles seem consistent throughout the page. There is no apparent text overlap.
 
-**CONVERSION RISKS:** 
-A potential conversion risk could be the partial cutoff of the left sidebar, which might contain crucial information or actions (like the booking confirmation checkbox). Users might miss important details or be unable to interact with certain elements if they're not fully visible. Additionally, if the "Book" or confirmation button is not immediately visible or easily accessible without scrolling, it could hinder the completion of the booking.
+**CONVERSION RISKS**: 
+A potential conversion risk is that the time slots on the right side may not be fully visible without scrolling, which could make it difficult for users to select a preferred time. Additionally, there is no clear "Book Now" or "Confirm" button visible in the screenshot, which might confuse users about the next steps.
 
-**OVERALL SCORE:** 
-Given the observations, I would rate the visual UX quality a 7 out of 10. The interface is largely clear and functional, with good readability. However, the layout could be improved for better responsiveness, especially to ensure that all necessary elements for completing a booking are easily accessible and visible at this screen size.
+**OVERALL SCORE**: 
+Based on the provided screenshot, I would rate the visual UX quality an 8 out of 10. The layout is well-structured, and the key elements are visible. However, the potential truncation of the time slots and the unclear CTA might cause some usability issues. 
+
+Recommendations for improvement: 
+1. Ensure that all time slots are fully visible without scrolling.
+2. Make the "Book Now" or "Confirm" button more prominent.
+3. Verify that the layout is responsive and works well across different screen sizes and devices.
 
 ---
 
 
 ### Tablet (768x1024)
 
-**LAYOUT: Are all key elements visible and properly positioned?**
-The layout appears to be mostly well-structured. The calendar view is prominently displayed, and the key elements such as date selection, time slots, and meeting details (e.g., "Requires confirmation", "15m", "Google Meet") are visible. However, the top section with the user's name ("Bailey Pumfleet") and the chat description seems a bit cramped. Additionally, the time slots (10:00pm, 10:15pm, 10:30pm) are positioned at the bottom of the screen, which might be a bit far down for easy access on a tablet viewport.
+**LAYOUT**: 
+The layout appears to be mostly suitable for a tablet viewport of 768x1024. The key elements such as the calendar, date selection, and time slots are visible. However, the top section with the chat information seems to be taking up a significant amount of space, which might not be ideal for a booking page on a tablet. 
 
-**CTA VISIBILITY: Is the primary call-to-action (book/select date) clearly visible without scrolling?**
-The primary call-to-action (selecting a date and time) appears to be mostly visible without scrolling. The calendar view and the selected date (Fri 20) are clearly visible, and the available time slots are also visible. However, the actual "Book" or "Confirm" button is not visible in this screenshot, which could be a concern.
+**CTA VISIBILITY**: 
+The primary call-to-action (CTA) is not clearly visible without scrolling. The "Book" or "Select Date" button is not visible in the provided screenshot. The user needs to scroll down to see more of the page and possibly find the CTA.
 
-**READABILITY: Is text legible and not overlapping?**
-The text appears to be legible, with clear font sizes and spacing. The calendar dates and day of the week labels (MON, TUE, etc.) are easily readable. There doesn't appear to be any overlapping text.
+**READABILITY**: 
+The text on the page appears to be legible, with clear labels for the days of the week, dates, and times. The font sizes seem adequate for a tablet viewport. There is no noticeable overlapping of text.
 
-**CONVERSION RISKS: Any visual issues that could prevent a user from completing a booking?**
-One potential conversion risk is that the "Book" or "Confirm" button is not visible in this screenshot. Users may be confused about how to proceed with booking after selecting a date and time. Additionally, the time slots are limited to a specific range (10:00pm - 10:30pm), which might not be suitable for all users.
+**CONVERSION RISKS**: 
+A potential conversion risk is that the user needs to scroll down to find the actual booking or date selection CTA. This might lead to users missing the CTA or getting confused about what to do next. Another risk is that the chat section seems unrelated to the booking process and takes up a significant amount of space, potentially distracting the user from the main task.
 
-**OVERALL SCORE: Rate the visual UX quality from 1-10**
-Overall, I would rate the visual UX quality as an 8 out of 10. The layout is mostly well-structured, and key elements are visible. However, the potential issues with CTA visibility and limited time slots might cause some usability concerns. With some adjustments to make the CTA more prominent and flexible time slot options, this could be a smooth booking experience.
+**OVERALL SCORE**: 
+I would rate the visual UX quality of this booking page as a 7 out of 10. While the page seems to be functional and readable, there are some layout and CTA visibility issues that could be improved to enhance the user experience.
 
 ---
 
 
 ### Mobile (375x812)
 
-Here is my review of the booking page:
+**LAYOUT:**
+The layout appears to be mostly well-structured, but there are some issues with element positioning on a mobile viewport of 375x812. The calendar view for date selection seems to be cut off at the bottom, with time slots (11:00pm, 11:15pm, etc.) partially visible but not fully accessible without scrolling. The top section with user information, chat option, and meeting details is well-arranged.
 
-**1. LAYOUT: Are all key elements visible and properly positioned?**
-The layout appears to be mostly well-structured, but there are some issues with element positioning. The calendar view takes up most of the screen, with the date selection buttons and time slots at the bottom. However, the top section with the user's name, "Bailey Pumfleet", and the chat/call options seems cramped and might be overlapping with other elements on smaller screens. The timezone selection is also visible but appears to be cut off on the right side.
+**CTA VISIBILITY:**
+The primary call-to-action (CTA), which seems to be related to booking or selecting a date and time, is not clearly visible without scrolling. The time slots for selection on April 24th are visible but appear to be cut off, which could make it difficult for users to complete the booking process without scrolling.
 
-**2. CTA VISIBILITY: Is the primary call-to-action (book/select date) clearly visible without scrolling?**
-The primary call-to-action (selecting a date and time) is mostly visible, but it appears that the user needs to scroll down to view the available time slots (10:00pm, 10:15pm, 10:30pm). The "Book" or "Select date" button is not visible in this screenshot, which could be a concern.
+**READABILITY:**
+The text appears to be legible, with clear labels for days of the week, dates, and times. There are no obvious font size or style issues making the text hard to read. However, the close proximity of the time slots could potentially cause issues if tapped incorrectly.
 
-**3. READABILITY: Is text legible and not overlapping?**
-The text appears to be legible, with clear labels for the days of the week and dates. However, some text might be too small, especially on smaller screens. The font sizes and line heights seem adequate, but a closer review on a smaller screen would be necessary to confirm.
+**CONVERSION RISKS:**
+There are a few conversion risks:
+1. The calendar interface and time slots are not fully visible, which could confuse users or make it difficult for them to select a suitable time, potentially leading to abandoned bookings.
+2. The CTA to finalize the booking is not visible in the provided screenshot, which might cause users to struggle with completing the booking process.
 
-**4. CONVERSION RISKS: Any visual issues that could prevent a user from completing a booking?**
-There are a few potential conversion risks:
-
-* The "Book" or "Select date" button is not visible, which could confuse users.
-* The timezone selection appears to be cut off on the right side, which might lead to users not noticing it or being unable to access it.
-* The available time slots are only visible after scrolling down, which might lead to users not noticing them.
-
-**5. OVERALL SCORE: Rate the visual UX quality from 1-10**
-I would rate the visual UX quality as a 7 out of 10. While the layout appears to be mostly well-structured, there are some issues with element positioning, CTA visibility, and potential conversion risks. With some adjustments to layout, font sizes, and button visibility, the UX quality could be improved.
+**OVERALL SCORE:**
+Based on the analysis, I would give the visual UX quality a score of 6 out of 10. The layout and readability are mostly fine, but the visibility and accessibility of key elements, especially on a mobile viewport, present significant usability challenges that could hinder the booking flow. Improving the visibility of the CTA and ensuring that all interactive elements are easily accessible without excessive scrolling would enhance the user experience.
 
 ---
 

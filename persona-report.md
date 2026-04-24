@@ -1,7 +1,6 @@
 # Synthetic Persona Engine Report
 
 ## Summary
-
 - **Total Personas Tested:** 8
 - **Passed:** 8
 - **Failed:** 0  
@@ -11,13 +10,13 @@
 
 ## Persona Results
 
-### Persona 1: Élodie François-Savignac
 
+### Persona 1: Åke Jørgensen
 - **Status:** ✅ Passed
-- **Risk Level:** HIGH
+- **Risk Level:** MEDIUM
 - **Timezone:** Pacific/Kiritimati
 - **Scenario:** Booking a meeting with a team member in a different timezone
-- **Edge Case:** Testing if the platform handles UTC+14 correctly
+- **Edge Case:** Testing scheduling with a user in an extreme timezone like UTC+14
 - **Screenshot:** persona-screenshots/persona-1.png
 
 **Technical Findings:**
@@ -28,204 +27,198 @@
 
 **UX Friction Points:**
 ⚠️  UX: Event title not immediately visible — user may not know what they are booking
-⚠️  UX: The timezone displayed (Pacific/Apia) does not match the user's timezone (Pacific/Kiritimati), which may cause confusion when scheduling a meeting, potentially leading to incorrect meeting times.
-⚠️  UX: The time selection options (10:00am, 10:15am, 10:30am) are not adjusted according to the user's timezone (UTC+14), which may result in the user selecting an incorrect time due to the timezone difference.
-⚠️  UX: There is no clear indication that the platform supports UTC+14, and the user may need to manually adjust the time or verify the meeting time in a separate calendar application, adding extra steps and potentially causing errors.
+⚠️  UX: The timezone difference between the user and the team member may cause confusion when scheduling a meeting, as the user needs to consider the extreme timezone (UTC+14) and how it translates to their own timezone, potentially leading to errors in meeting scheduling.
+⚠️  UX: The limited time slots available (only 15-minute slots) may not be sufficient for users who need to discuss something that requires more time, potentially causing frustration and abandonment of the booking process.
+⚠️  UX: The "Select..." dropdown for the meeting platform (Google Meet) may not be immediately visible or accessible on a mobile viewport (375x812), potentially causing users to overlook this essential step in the booking process and leading to conversion risks.
 
 ---
 
-### Persona 2: Dr. John "JD" Dōe Jr
-
+### Persona 2: Dr. María Rodríguez López García Hernández
 - **Status:** ✅ Passed
-- **Risk Level:** MEDIUM
-- **Timezone:** America/Adak
-- **Scenario:** Scheduling a same-day appointment
-- **Edge Case:** Testing same-day booking with a user in a UTC-12 timezone
+- **Risk Level:** LOW
+- **Timezone:** America/Bogota
+- **Scenario:** Scheduling a series of appointments for the upcoming week
+- **Edge Case:** Testing the system with a user having a very long name
 - **Screenshot:** persona-screenshots/persona-2.png
 
 **Technical Findings:**
 ✅ Page loaded successfully
+✅ Event title visible
 ✅ First available date is visible without scrolling
 ✅ Calendar rendered correctly
 ✅ Time slots rendered after date selection
 
 **UX Friction Points:**
-⚠️  UX: Event title not immediately visible — user may not know what they are booking
-⚠️  UX: The time zone difference (UTC-12) may cause confusion when scheduling a same-day appointment, as the user's current date may not match the date displayed on the calendar, potentially leading to incorrect scheduling.
-⚠️  UX: The "Today" label on the calendar may be misleading, as it may not reflect the user's current day in the America/Adak time zone, which could be a day ahead or behind the calendar's displayed date.
-⚠️  UX: The lack of clear indication of the user's current time in relation to the available time slots (e.g., 11:00am, 11:15am) may cause difficulty in selecting a suitable same-day appointment time, especially considering the significant time zone difference.
+⚠️  UX: The user with a very long name may experience issues with their name being truncated or not fully displayed on the booking page, potentially causing confusion or inconvenience when trying to schedule appointments.
+⚠️  UX: The lack of a clear "book" or "schedule" button on the page may cause friction for the user, as they may need to spend extra time searching for the correct action to take in order to schedule their appointments.
+⚠️  UX: The small time slots (15-minute intervals) and lack of a "select multiple" option may lead to conversion risk, as the user may need to repeat the scheduling process multiple times to book a series of appointments, potentially leading to frustration and abandonment.
 
 ---
 
-### Persona 3: verylongnamethatwilllikelycausesomeissuesherenameisveryverylongandwilllikelycausessomeproblems
-
+### Persona 3: John.Doe
 - **Status:** ✅ Passed
-- **Risk Level:** LOW
-- **Timezone:** Europe/London
-- **Scenario:** Booking a recurring meeting
-- **Edge Case:** Testing if the platform can handle very long names
+- **Risk Level:** MEDIUM
+- **Timezone:** UTC-12
+- **Scenario:** Booking a same-day appointment
+- **Edge Case:** Testing the system with a user having an unusual email format and in an extreme timezone like UTC-12
 - **Screenshot:** persona-screenshots/persona-3.png
 
 **Technical Findings:**
 ✅ Page loaded successfully
-✅ Event title visible
 ✅ First available date is visible without scrolling
 ✅ Calendar rendered correctly
 ✅ Time slots rendered after date selection
-✅ Time slot buttons visible without scrolling
 
 **UX Friction Points:**
-⚠️  UX: The overlay calendar view may become cluttered and difficult to navigate if the user, Bailey Pumfleet, has a large number of recurring meetings, making it hard to find a suitable time slot.
-⚠️  UX: The input field for the meeting name is not visible, which may cause issues if the user wants to enter a very long name, as the edge case suggests, potentially leading to an error or truncation of the name.
-⚠️  UX: The time selection options (12h, 24h) and specific time slots (20:00, 20:15, 20:30) may not be sufficient for users who need more granular control over their meeting schedule, potentially causing frustration and abandonment of the booking process.
+⚠️  UX: Event title not immediately visible — user may not know what they are booking
+⚠️  UX: The calendar view may not be optimized for the user's extreme timezone (UTC-12), potentially causing confusion when selecting a same-day appointment time, as the timezone difference may not be clearly accounted for.
+⚠️  UX: The email format of "Bailey Pumfleet" is not explicitly validated, and an unusual email format may cause issues with the booking confirmation process, potentially leading to errors or failed bookings.
+⚠️  UX: The "Select..." dropdown for choosing a Google Meet link does not provide clear instructions or validation, which may cause friction for users with unusual email formats or those in extreme timezones, potentially leading to incorrect or incomplete bookings.
 
 ---
 
-### Persona 4: हेमंत कुमार
-
+### Persona 4: Leia Organa
 - **Status:** ✅ Passed
-- **Risk Level:** MEDIUM
-- **Timezone:** Asia/Kolkata
-- **Scenario:** Scheduling a meeting with a team member in a different locale
-- **Edge Case:** Testing if the platform handles non-ASCII characters in names
+- **Risk Level:** HIGH
+- **Timezone:** Asia/Tokyo
+- **Scenario:** Scheduling a meeting for a date far in the future, 10 years from now
+- **Edge Case:** Testing the system's date handling for far-future dates
 - **Screenshot:** persona-screenshots/persona-4.png
 
 **Technical Findings:**
 ✅ Page loaded successfully
-✅ Event title visible
-✅ First available date is visible without scrolling
-✅ Calendar rendered correctly
-✅ Time slots rendered after date selection
-
-**UX Friction Points:**
-⚠️  UX: The current locale (Asia/Kolkata) and timezone may not be the default for the team member in a different locale, which could lead to scheduling conflicts or confusion if not properly handled by the platform.
-⚠️  UX: The platform's handling of non-ASCII characters in names is not explicitly tested in this scenario, which could result in errors or incorrect display of names, potentially causing issues with meeting scheduling or communication.
-⚠️  UX: The small viewport size (375x812) on a mobile device may lead to a cluttered interface, making it difficult for the user to easily select a meeting time or view important details, such as the meeting duration (15m) or the Google Meet link.
-
----
-
-### Persona 5: Maria Rodriguez
-
-- **Status:** ✅ Passed
-- **Risk Level:** LOW
-- **Timezone:** America/New_York
-- **Scenario:** Booking a meeting on a mobile device
-- **Edge Case:** Testing if the platform is responsive on small viewports
-- **Screenshot:** persona-screenshots/persona-5.png
-
-**Technical Findings:**
-✅ Page loaded successfully
 ✅ First available date is visible without scrolling
 ✅ Calendar rendered correctly
 ✅ Time slots rendered after date selection
 
 **UX Friction Points:**
 ⚠️  UX: Event title not immediately visible — user may not know what they are booking
-⚠️  UX: The viewport size of 1280x720 is not a small viewport as requested in the edge case, which may not accurately test the responsiveness of the platform on small viewports, such as those found on mobile devices.
-⚠️  UX: The page content does not appear to be optimized for a mobile device, with multiple overlapping elements and no clear call-to-action (CTA) to book a meeting, which may cause confusion for the user.
-⚠️  UX: The time selection options (e.g. 4:00pm, 4:15pm, 4:30pm) may be too dense and difficult to tap on a small viewport, increasing the likelihood of accidental selections and frustrating the user.
+⚠️  UX: The calendar view only displays dates for the current and next month, making it difficult for the user to schedule a meeting 10 years in the future, requiring excessive scrolling or navigation to reach the desired date.
+⚠️  UX: The time selection options are limited to 15-minute increments, and the user must scroll through a long list of time slots, which may be tedious and prone to error, especially when trying to schedule a meeting at a specific time in the far future.
+⚠️  UX: There is no clear indication of how to schedule a meeting for a date beyond the current month or year, which may lead to user confusion and frustration, potentially causing them to abandon the booking process.
 
 ---
 
-### Persona 6: Liam Chen
+### Persona 5: MobileUser
+- **Status:** ✅ Passed
+- **Risk Level:** MEDIUM
+- **Timezone:** America/New_York
+- **Scenario:** Booking an appointment using a mobile device
+- **Edge Case:** Testing the system's responsiveness and usability on a mobile-sized viewport
+- **Screenshot:** persona-screenshots/persona-5.png
 
+**Technical Findings:**
+✅ Page loaded successfully
+✅ Event title visible
+✅ First available date is visible without scrolling
+✅ Calendar rendered correctly
+✅ Time slots rendered after date selection
+
+**UX Friction Points:**
+⚠️  UX: The viewport size is set to 1280x720, which is a desktop-sized viewport, but the persona is testing the system's responsiveness and usability on a mobile-sized viewport, which may cause inconsistencies in the testing results.
+⚠️  UX: The "Overlay my calendar" option may cause confusion for the user, as it is not clear what this option does or how it will affect the booking process, potentially leading to abandoned bookings.
+⚠️  UX: The time slots available for booking are listed in 15-minute increments, but the "Requires confirmation" appointment is listed as 15m, which may cause confusion about whether the appointment duration is 15 minutes or if it's just a flag indicating that confirmation is required, potentially leading to miscommunication about the appointment length.
+
+---
+
+### Persona 6: Slow Connection
 - **Status:** ✅ Passed
 - **Risk Level:** HIGH
-- **Timezone:** Australia/Sydney
-- **Scenario:** Scheduling a meeting with a slow internet connection
-- **Edge Case:** Simulating a slow connection to test platform performance
+- **Timezone:** Europe/London
+- **Scenario:** Booking an appointment with a slow internet connection
+- **Edge Case:** Testing the system's performance and handling of slow or unreliable connections
 - **Screenshot:** persona-screenshots/persona-6.png
 
 **Technical Findings:**
 ✅ Page loaded successfully
-✅ Event title visible
-✅ First available date is visible without scrolling
-✅ Calendar rendered correctly
-✅ Time slots rendered after date selection
-
-**UX Friction Points:**
-⚠️  UX: The booking page may take longer to load with a slow internet connection, potentially causing frustration and increasing the likelihood of the user abandoning the booking process.
-⚠️  UX: The calendar view may not load properly or may be slow to update when switching between monthly, weekly, and column views, making it difficult for the user to schedule a meeting.
-⚠️  UX: The "Requires confirmation" and "Hop on a call" buttons may not respond quickly to user input, leading to uncertainty about whether the booking request has been successfully submitted.
-
----
-
-### Persona 7: Anaïs Dupont
-
-- **Status:** ✅ Passed
-- **Risk Level:** MEDIUM
-- **Timezone:** Europe/Paris
-- **Scenario:** Booking a meeting and then navigating back to the calendar view
-- **Edge Case:** Testing if the platform handles back and forth navigation correctly
-- **Screenshot:** persona-screenshots/persona-7.png
-
-**Technical Findings:**
-✅ Page loaded successfully
-✅ Event title visible
-✅ First available date is visible without scrolling
-✅ Calendar rendered correctly
-✅ Time slots rendered after date selection
-
-**UX Friction Points:**
-⚠️  UX: Time slot buttons are below the fold — user must scroll to complete booking (conversion risk)
-⚠️  UX: The booking page does not provide a clear "Confirm Booking" or "Book Now" button, which may cause confusion for the user and lead to conversion risk.
-⚠️  UX: The time slots are listed in 15-minute increments, but there is no clear indication of the selected time slot or a way to easily switch between different time slots, potentially causing friction for the user.
-⚠️  UX: After booking a meeting, the platform's handling of back and forth navigation may not be clear, and the user may not be able to easily return to the calendar view or understand the status of their booking, which could lead to frustration and conversion risk.
-
----
-
-### Persona 8: Sofia Jensen
-
-- **Status:** ✅ Passed
-- **Risk Level:** LOW
-- **Timezone:** Europe/Copenhagen
-- **Scenario:** Scheduling a meeting far in the future
-- **Edge Case:** Testing if the platform can handle dates more than a year in advance
-- **Screenshot:** persona-screenshots/persona-8.png
-
-**Technical Findings:**
-✅ Page loaded successfully
-✅ Event title visible
 ✅ First available date is visible without scrolling
 ✅ Calendar rendered correctly
 ✅ Time slots rendered after date selection
 ✅ Time slot buttons visible without scrolling
 
 **UX Friction Points:**
-⚠️  UX: The calendar view only displays a single month at a time, requiring the user to navigate to each subsequent month to schedule a meeting more than a year in advance, which can be time-consuming and frustrating.
-⚠️  UX: There is no visible option to quickly jump to a specific date or month, forcing the user to click through each month individually to reach a date more than a year away.
-⚠️  UX: The "Switch to monthly view", "Switch to weekly view", and "Switch to column view" options may not provide sufficient support for scheduling meetings far in the future, as they do not appear to offer a more efficient way to navigate to distant dates.
+⚠️  UX: Event title not immediately visible — user may not know what they are booking
+⚠️  UX: The booking page may take a long time to load or fail to load completely with a slow internet connection, causing frustration and potentially leading to abandonment.
+⚠️  UX: The calendar view may not update in real-time, causing the user to miss available time slots or book a time slot that is no longer available, due to the slow internet connection delaying the update.
+⚠️  UX: The "Hop on a call" and "Google Meet" features may not function properly or at all with a slow internet connection, making it difficult for the user to complete the booking or communicate with the service provider.
+
+---
+
+### Persona 7: Navigator
+- **Status:** ✅ Passed
+- **Risk Level:** MEDIUM
+- **Timezone:** Australia/Sydney
+- **Scenario:** Navigating back and forth between scheduling pages before confirming a booking
+- **Edge Case:** Testing the system's handling of user navigation and potential caching issues
+- **Screenshot:** persona-screenshots/persona-7.png
+
+**Technical Findings:**
+✅ Page loaded successfully
+✅ First available date is visible without scrolling
+✅ Calendar rendered correctly
+✅ Time slots rendered after date selection
+
+**UX Friction Points:**
+⚠️  UX: Event title not immediately visible — user may not know what they are booking
+⚠️  UX: The booking page does not provide a clear "Back" or "Cancel" button, which may cause confusion for users like Bailey Pumfleet who need to navigate back and forth between scheduling pages, potentially leading to accidental bookings or frustration.
+⚠️  UX: The page lacks a progress indicator or a clear indication of the booking process steps, which may cause users to feel uncertain about their navigation and potentially abandon the booking process.
+⚠️  UX: The time selection options are presented in 15-minute increments, but there is no clear indication of the selected time or a summary of the booking details, which may lead to mistakes or misunderstandings, especially for users navigating back and forth between pages.
+
+---
+
+### Persona 8: François Dupont
+- **Status:** ✅ Passed
+- **Risk Level:** LOW
+- **Timezone:** Europe/Paris
+- **Scenario:** Scheduling an appointment in a locale with a different date format
+- **Edge Case:** Testing the system's handling of date formats in different locales, such as DD/MM/YYYY
+- **Screenshot:** persona-screenshots/persona-8.png
+
+**Technical Findings:**
+✅ Page loaded successfully
+✅ First available date is visible without scrolling
+✅ Calendar rendered correctly
+✅ Time slots rendered after date selection
+✅ Time slot buttons visible without scrolling
+
+**UX Friction Points:**
+⚠️  UX: Event title not immediately visible — user may not know what they are booking
+⚠️  UX: The date format in the calendar view (e.g., "Mon27") may cause confusion for users in the Europe/Paris locale, where the date format is typically DD/MM/YYYY, as it does not explicitly display the day and month.
+⚠️  UX: The time slots (e.g., "16:00", "16:15") are not clearly indicated as being in the Europe/Paris timezone, which may lead to misunderstandings about the scheduled call time.
+⚠️  UX: The "Today" label on the calendar does not account for the user's current date in the Europe/Paris locale, potentially causing confusion when trying to schedule a call for the current day.
+
 
 ## UX Friction Summary
-
 ⚠️  UX: Event title not immediately visible — user may not know what they are booking
-⚠️  UX: The timezone displayed (Pacific/Apia) does not match the user's timezone (Pacific/Kiritimati), which may cause confusion when scheduling a meeting, potentially leading to incorrect meeting times.
-⚠️  UX: The time selection options (10:00am, 10:15am, 10:30am) are not adjusted according to the user's timezone (UTC+14), which may result in the user selecting an incorrect time due to the timezone difference.
-⚠️  UX: There is no clear indication that the platform supports UTC+14, and the user may need to manually adjust the time or verify the meeting time in a separate calendar application, adding extra steps and potentially causing errors.
+⚠️  UX: The timezone difference between the user and the team member may cause confusion when scheduling a meeting, as the user needs to consider the extreme timezone (UTC+14) and how it translates to their own timezone, potentially leading to errors in meeting scheduling.
+⚠️  UX: The limited time slots available (only 15-minute slots) may not be sufficient for users who need to discuss something that requires more time, potentially causing frustration and abandonment of the booking process.
+⚠️  UX: The "Select..." dropdown for the meeting platform (Google Meet) may not be immediately visible or accessible on a mobile viewport (375x812), potentially causing users to overlook this essential step in the booking process and leading to conversion risks.
+⚠️  UX: The user with a very long name may experience issues with their name being truncated or not fully displayed on the booking page, potentially causing confusion or inconvenience when trying to schedule appointments.
+⚠️  UX: The lack of a clear "book" or "schedule" button on the page may cause friction for the user, as they may need to spend extra time searching for the correct action to take in order to schedule their appointments.
+⚠️  UX: The small time slots (15-minute intervals) and lack of a "select multiple" option may lead to conversion risk, as the user may need to repeat the scheduling process multiple times to book a series of appointments, potentially leading to frustration and abandonment.
 ⚠️  UX: Event title not immediately visible — user may not know what they are booking
-⚠️  UX: The time zone difference (UTC-12) may cause confusion when scheduling a same-day appointment, as the user's current date may not match the date displayed on the calendar, potentially leading to incorrect scheduling.
-⚠️  UX: The "Today" label on the calendar may be misleading, as it may not reflect the user's current day in the America/Adak time zone, which could be a day ahead or behind the calendar's displayed date.
-⚠️  UX: The lack of clear indication of the user's current time in relation to the available time slots (e.g., 11:00am, 11:15am) may cause difficulty in selecting a suitable same-day appointment time, especially considering the significant time zone difference.
-⚠️  UX: The overlay calendar view may become cluttered and difficult to navigate if the user, Bailey Pumfleet, has a large number of recurring meetings, making it hard to find a suitable time slot.
-⚠️  UX: The input field for the meeting name is not visible, which may cause issues if the user wants to enter a very long name, as the edge case suggests, potentially leading to an error or truncation of the name.
-⚠️  UX: The time selection options (12h, 24h) and specific time slots (20:00, 20:15, 20:30) may not be sufficient for users who need more granular control over their meeting schedule, potentially causing frustration and abandonment of the booking process.
-⚠️  UX: The current locale (Asia/Kolkata) and timezone may not be the default for the team member in a different locale, which could lead to scheduling conflicts or confusion if not properly handled by the platform.
-⚠️  UX: The platform's handling of non-ASCII characters in names is not explicitly tested in this scenario, which could result in errors or incorrect display of names, potentially causing issues with meeting scheduling or communication.
-⚠️  UX: The small viewport size (375x812) on a mobile device may lead to a cluttered interface, making it difficult for the user to easily select a meeting time or view important details, such as the meeting duration (15m) or the Google Meet link.
+⚠️  UX: The calendar view may not be optimized for the user's extreme timezone (UTC-12), potentially causing confusion when selecting a same-day appointment time, as the timezone difference may not be clearly accounted for.
+⚠️  UX: The email format of "Bailey Pumfleet" is not explicitly validated, and an unusual email format may cause issues with the booking confirmation process, potentially leading to errors or failed bookings.
+⚠️  UX: The "Select..." dropdown for choosing a Google Meet link does not provide clear instructions or validation, which may cause friction for users with unusual email formats or those in extreme timezones, potentially leading to incorrect or incomplete bookings.
 ⚠️  UX: Event title not immediately visible — user may not know what they are booking
-⚠️  UX: The viewport size of 1280x720 is not a small viewport as requested in the edge case, which may not accurately test the responsiveness of the platform on small viewports, such as those found on mobile devices.
-⚠️  UX: The page content does not appear to be optimized for a mobile device, with multiple overlapping elements and no clear call-to-action (CTA) to book a meeting, which may cause confusion for the user.
-⚠️  UX: The time selection options (e.g. 4:00pm, 4:15pm, 4:30pm) may be too dense and difficult to tap on a small viewport, increasing the likelihood of accidental selections and frustrating the user.
-⚠️  UX: The booking page may take longer to load with a slow internet connection, potentially causing frustration and increasing the likelihood of the user abandoning the booking process.
-⚠️  UX: The calendar view may not load properly or may be slow to update when switching between monthly, weekly, and column views, making it difficult for the user to schedule a meeting.
-⚠️  UX: The "Requires confirmation" and "Hop on a call" buttons may not respond quickly to user input, leading to uncertainty about whether the booking request has been successfully submitted.
-⚠️  UX: Time slot buttons are below the fold — user must scroll to complete booking (conversion risk)
-⚠️  UX: The booking page does not provide a clear "Confirm Booking" or "Book Now" button, which may cause confusion for the user and lead to conversion risk.
-⚠️  UX: The time slots are listed in 15-minute increments, but there is no clear indication of the selected time slot or a way to easily switch between different time slots, potentially causing friction for the user.
-⚠️  UX: After booking a meeting, the platform's handling of back and forth navigation may not be clear, and the user may not be able to easily return to the calendar view or understand the status of their booking, which could lead to frustration and conversion risk.
-⚠️  UX: The calendar view only displays a single month at a time, requiring the user to navigate to each subsequent month to schedule a meeting more than a year in advance, which can be time-consuming and frustrating.
-⚠️  UX: There is no visible option to quickly jump to a specific date or month, forcing the user to click through each month individually to reach a date more than a year away.
-⚠️  UX: The "Switch to monthly view", "Switch to weekly view", and "Switch to column view" options may not provide sufficient support for scheduling meetings far in the future, as they do not appear to offer a more efficient way to navigate to distant dates.
+⚠️  UX: The calendar view only displays dates for the current and next month, making it difficult for the user to schedule a meeting 10 years in the future, requiring excessive scrolling or navigation to reach the desired date.
+⚠️  UX: The time selection options are limited to 15-minute increments, and the user must scroll through a long list of time slots, which may be tedious and prone to error, especially when trying to schedule a meeting at a specific time in the far future.
+⚠️  UX: There is no clear indication of how to schedule a meeting for a date beyond the current month or year, which may lead to user confusion and frustration, potentially causing them to abandon the booking process.
+⚠️  UX: The viewport size is set to 1280x720, which is a desktop-sized viewport, but the persona is testing the system's responsiveness and usability on a mobile-sized viewport, which may cause inconsistencies in the testing results.
+⚠️  UX: The "Overlay my calendar" option may cause confusion for the user, as it is not clear what this option does or how it will affect the booking process, potentially leading to abandoned bookings.
+⚠️  UX: The time slots available for booking are listed in 15-minute increments, but the "Requires confirmation" appointment is listed as 15m, which may cause confusion about whether the appointment duration is 15 minutes or if it's just a flag indicating that confirmation is required, potentially leading to miscommunication about the appointment length.
+⚠️  UX: Event title not immediately visible — user may not know what they are booking
+⚠️  UX: The booking page may take a long time to load or fail to load completely with a slow internet connection, causing frustration and potentially leading to abandonment.
+⚠️  UX: The calendar view may not update in real-time, causing the user to miss available time slots or book a time slot that is no longer available, due to the slow internet connection delaying the update.
+⚠️  UX: The "Hop on a call" and "Google Meet" features may not function properly or at all with a slow internet connection, making it difficult for the user to complete the booking or communicate with the service provider.
+⚠️  UX: Event title not immediately visible — user may not know what they are booking
+⚠️  UX: The booking page does not provide a clear "Back" or "Cancel" button, which may cause confusion for users like Bailey Pumfleet who need to navigate back and forth between scheduling pages, potentially leading to accidental bookings or frustration.
+⚠️  UX: The page lacks a progress indicator or a clear indication of the booking process steps, which may cause users to feel uncertain about their navigation and potentially abandon the booking process.
+⚠️  UX: The time selection options are presented in 15-minute increments, but there is no clear indication of the selected time or a summary of the booking details, which may lead to mistakes or misunderstandings, especially for users navigating back and forth between pages.
+⚠️  UX: Event title not immediately visible — user may not know what they are booking
+⚠️  UX: The date format in the calendar view (e.g., "Mon27") may cause confusion for users in the Europe/Paris locale, where the date format is typically DD/MM/YYYY, as it does not explicitly display the day and month.
+⚠️  UX: The time slots (e.g., "16:00", "16:15") are not clearly indicated as being in the Europe/Paris timezone, which may lead to misunderstandings about the scheduled call time.
+⚠️  UX: The "Today" label on the calendar does not account for the user's current date in the Europe/Paris locale, potentially causing confusion when trying to schedule a call for the current day.
 
 ---
 

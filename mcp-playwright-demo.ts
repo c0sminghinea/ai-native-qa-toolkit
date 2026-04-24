@@ -1,12 +1,7 @@
-import * as dotenv from 'dotenv';
-import Groq from 'groq-sdk';
+import { groqChat, MODELS } from './ai-tools/groq-client';
 import * as fs from 'fs';
 import * as path from 'path';
 import { spawn } from 'child_process';
-
-dotenv.config();
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 async function sendMCPMessage(
   process: ReturnType<typeof spawn>,
@@ -115,8 +110,8 @@ async function runPlaywrightMCPDemo() {
 
     // Ask AI to analyze what it sees and decide next action
     console.log('🧠 Asking AI to analyze MCP snapshot and decide action...\n');
-    const aiDecision = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+    const aiDecision = await groqChat({
+      model: MODELS.text,
       messages: [
         {
           role: 'system',

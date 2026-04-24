@@ -1,33 +1,26 @@
-import * as dotenv from 'dotenv';
-import Groq from 'groq-sdk';
+import { groqChat, MODELS } from './groq-client';
+import { handleToolError, saveReport } from './tool-utils';
 import * as fs from 'fs';
 import * as path from 'path';
 
-dotenv.config();
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const MAX_CONTENT_CHARS = 8000;
 
 async function analyzeFailure(errorLog: string, testFile: string) {
   console.log('\n🔍 Analyzing test failure...\n');
 
   try {
-    // Validate inputs
-    if (!process.env.GROQ_API_KEY) {
-      throw new Error('GROQ_API_KEY is not set in your .env file');
-    }
-
     if (!fs.existsSync(testFile)) {
       throw new Error(`Test file not found: ${testFile}`);
     }
 
-    const testCode = fs.readFileSync(testFile, 'utf-8');
+    const testCode = fs.readFileSync(testFile, 'utf-8').substring(0, MAX_CONTENT_CHARS);
 
     if (!errorLog.trim()) {
       throw new Error('Error log is empty — nothing to analyze');
     }
 
-    const result = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+    const result = await groqChat({
+      model: MODELS.text,
       messages: [
         {
           role: 'system',
@@ -55,21 +48,13 @@ Provide:
     console.log('📋 Analysis:\n');
     console.log(analysis);
     console.log('\n');
+    saveReport('failure-analysis-report.md', `# Failure Analysis Report\n\n${analysis}`);
 
   } catch (err) {
-    if (err instanceof Error) {
-      console.error('\n❌ Analysis failed:', err.message);
-      if (err.message.includes('API key')) {
-        console.error('💡 Add GROQ_API_KEY=your_key to your .env file');
-      } else if (err.message.includes('not found')) {
-        console.error('💡 Check the test file path exists');
-      } else {
-        console.error('💡 Check your network connection and API key validity');
-      }
-    } else {
-      console.error('\n❌ Unexpected error:', err);
-    }
-    process.exit(1);
+    handleToolError(err, {
+      'API key': 'Add GROQ_API_KEY=your_key to your .env file',
+      'not found': 'Check the test file path exists',
+    });
   }
 }
 
@@ -84,6 +69,12 @@ Error: strict mode violation: getByText('Chat') resolved to 2 elements:
 `;
 
 const testFile = path.join(process.cwd(), 'tests', 'booking-flow.spec.ts');
-const errorLog = process.argv[2] ? fs.readFileSync(process.argv[2], 'utf-8') : sampleError;
 
-analyzeFailure(errorLog, testFile);
+let errorLog: string;
+try {
+  errorLog = process.argv[2] ? fs.readFileSync(process.argv[2], 'utf-8') : sampleError;
+} catch (err) {
+  handleToolError(err, { 'no such file': 'Pass a valid path to an error log file as the first argument' });
+}
+
+analyzeFailure(errorLog!, testFile);

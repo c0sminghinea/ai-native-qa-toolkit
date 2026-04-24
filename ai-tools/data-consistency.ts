@@ -1,12 +1,6 @@
-import * as dotenv from 'dotenv';
-import Groq from 'groq-sdk';
-import { chromium } from '@playwright/test';
-import * as fs from 'fs';
-import * as path from 'path';
-
-dotenv.config();
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+import { groqChat, MODELS } from './groq-client';
+import { saveReport, sleep } from './tool-utils';
+import { chromium, Browser } from '@playwright/test';
 
 interface PageCheck {
   name: string;
@@ -33,21 +27,21 @@ interface ConsistencyResult {
 async function extractDataFromPage(
   url: string,
   dataKey: string,
-  pageName: string
+  pageName: string,
+  browser: Browser
 ): Promise<DataPoint> {
-  const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext();
   const page = await context.newPage();
 
   try {
     await page.goto(url, { timeout: 15000 });
-    await page.waitForTimeout(2000);
+    await sleep(2000);
 
     const pageText = await page.evaluate(() => document.body.innerText);
 
     // Ask AI to extract the specific data point from page content
-    const result = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+    const result = await groqChat({
+      model: MODELS.text,
       messages: [
         {
           role: 'system',
@@ -83,7 +77,7 @@ Rules:
     };
 
   } finally {
-    await browser.close();
+    await context.close(); // reuse the shared browser — only close this context
   }
 }
 
@@ -113,8 +107,8 @@ async function analyzeConsistency(
   }
 
   // Ask AI for deeper analysis
-  const result = await groq.chat.completions.create({
-    model: 'llama-3.3-70b-versatile',
+  const result = await groqChat({
+    model: MODELS.text,
     messages: [
       {
         role: 'system',
@@ -150,42 +144,55 @@ async function runDataConsistencyCheck(
   console.log('Verifying data integrity across marketplace pages...\n');
 
   const results: ConsistencyResult[] = [];
+  // One browser for the entire run — contexts are closed after each page visit
+  const browser = await chromium.launch({ headless: true });
 
-  for (const check of dataPoints) {
-    console.log(`\n📊 Checking: "${check.key}"`);
-    console.log(`   Pages: ${check.pages.map(p => p.name).join(', ')}\n`);
+  try {
+    for (const check of dataPoints) {
+      console.log(`\n📊 Checking: "${check.key}"`);
+      console.log(`   Pages: ${check.pages.map(p => p.name).join(', ')}\n`);
 
-    const extractedData: DataPoint[] = [];
+      const extractedData: DataPoint[] = [];
 
-    for (const pageCheck of check.pages) {
-      console.log(`   🌐 Visiting ${pageCheck.name}...`);
-      const dataPoint = await extractDataFromPage(
-        pageCheck.url,
-        check.key,
-        pageCheck.name
-      );
-      console.log(`   ${dataPoint.found ? '✅' : '❌'} ${pageCheck.name}: ${dataPoint.value || 'NOT FOUND'}`);
-      extractedData.push(dataPoint);
-      await new Promise(r => setTimeout(r, 1000));
+      for (const pageCheck of check.pages) {
+        console.log(`   🌐 Visiting ${pageCheck.name}...`);
+        let dataPoint: DataPoint;
+        try {
+          dataPoint = await extractDataFromPage(
+            pageCheck.url,
+            check.key,
+            pageCheck.name,
+            browser
+          );
+        } catch (err) {
+          console.error(`   ❌ Failed to visit ${pageCheck.name}: ${err instanceof Error ? err.message : err}`);
+          dataPoint = { page: pageCheck.name, url: pageCheck.url, value: null, context: '', found: false };
+        }
+        console.log(`   ${dataPoint.found ? '✅' : '❌'} ${pageCheck.name}: ${dataPoint.value || 'NOT FOUND'}`);
+        extractedData.push(dataPoint);
+        await sleep(1000);
+      }
+
+      const analysis = await analyzeConsistency(check.key, extractedData);
+
+      const result: ConsistencyResult = {
+        dataKey: check.key,
+        consistent: analysis.consistent,
+        values: extractedData,
+        discrepancies: analysis.discrepancies,
+        aiAnalysis: analysis.aiAnalysis
+      };
+
+      results.push(result);
+
+      const status = analysis.consistent ? '✅ CONSISTENT' : '❌ INCONSISTENT';
+      console.log(`\n   Result: ${status}`);
+      if (!analysis.consistent && analysis.discrepancies.length > 0) {
+        analysis.discrepancies.forEach(d => console.log(`   ⚠️  ${d}`));
+      }
     }
-
-    const analysis = await analyzeConsistency(check.key, extractedData);
-
-    const result: ConsistencyResult = {
-      dataKey: check.key,
-      consistent: analysis.consistent,
-      values: extractedData,
-      discrepancies: analysis.discrepancies,
-      aiAnalysis: analysis.aiAnalysis
-    };
-
-    results.push(result);
-
-    const status = analysis.consistent ? '✅ CONSISTENT' : '❌ INCONSISTENT';
-    console.log(`\n   Result: ${status}`);
-    if (!analysis.consistent && analysis.discrepancies.length > 0) {
-      analysis.discrepancies.forEach(d => console.log(`   ⚠️  ${d}`));
-    }
+  } finally {
+    await browser.close();
   }
 
   await generateReport(results);
@@ -247,28 +254,26 @@ This tool catches these issues automatically before they reach users.
 *Generated by AI-Native QA Toolkit — Data Consistency Module*
 `;
 
-  const reportPath = path.join(process.cwd(), 'data-consistency-report.md');
-  fs.writeFileSync(reportPath, report);
-
-  console.log(`\n📄 Report saved to: data-consistency-report.md`);
+  saveReport('data-consistency-report.md', report);
   console.log(`\n✅ ${consistent}/${results.length} data points consistent`);
 }
 
 // ─── Define what to check ────────────────────────────────────────────────
 // Using cal.com as the demo target — checking if event/host data
 // is consistent across the profile page, event page, and embed
+const TARGET = process.env.BASE_URL || 'https://cal.com';
 const checksToRun = [
   {
     key: 'host name',
     pages: [
       {
         name: 'Profile Page',
-        url: 'https://cal.com/bailey',
+        url: `${TARGET}/bailey`,
         description: 'Main profile listing page'
       },
       {
         name: 'Event Page',
-        url: 'https://cal.com/bailey/chat',
+        url: `${TARGET}/bailey/chat`,
         description: 'Individual event booking page'
       }
     ]
@@ -278,12 +283,12 @@ const checksToRun = [
     pages: [
       {
         name: 'Profile Page',
-        url: 'https://cal.com/bailey',
+        url: `${TARGET}/bailey`,
         description: 'Duration shown on profile listing'
       },
       {
         name: 'Event Page',
-        url: 'https://cal.com/bailey/chat',
+        url: `${TARGET}/bailey/chat`,
         description: 'Duration shown on booking page'
       }
     ]
@@ -293,12 +298,12 @@ const checksToRun = [
     pages: [
       {
         name: 'Profile Page',
-        url: 'https://cal.com/bailey',
+        url: `${TARGET}/bailey`,
         description: 'Meeting platform shown on profile'
       },
       {
         name: 'Event Page',
-        url: 'https://cal.com/bailey/chat',
+        url: `${TARGET}/bailey/chat`,
         description: 'Meeting platform shown on booking page'
       }
     ]

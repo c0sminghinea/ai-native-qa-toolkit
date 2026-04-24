@@ -1,12 +1,8 @@
-import * as dotenv from 'dotenv';
-import Groq from 'groq-sdk';
+import { groqChat, MODELS } from './groq-client';
+import { handleToolError, sleep, DEFAULT_TARGET_URL } from './tool-utils';
 import { chromium } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
-
-dotenv.config();
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 async function explorePage(url: string) {
   const browser = await chromium.launch({ headless: true });
@@ -17,7 +13,7 @@ async function explorePage(url: string) {
       throw new Error(`Could not load URL: ${url} — check it is accessible`);
     });
 
-    await page.waitForTimeout(2000);
+    await sleep(2000);
 
     const data = await page.evaluate(() => {
       const testIds = Array.from(document.querySelectorAll('[data-testid]'))
@@ -66,10 +62,6 @@ async function explorePage(url: string) {
 
 async function generateTests(url: string) {
   try {
-    if (!process.env.GROQ_API_KEY) {
-      throw new Error('GROQ_API_KEY is not set in your .env file');
-    }
-
     if (!url.startsWith('http')) {
       throw new Error(`Invalid URL: "${url}" — must start with http or https`);
     }
@@ -117,16 +109,21 @@ async function generateTests(url: string) {
       'Rules:',
       '- Use ONLY selectors listed above',
       '- getByTestId() for data-testid elements',
-      '- getByRole("button", { name }) for buttons',
+      '- getByRole("button", { name }) for buttons without data-testid',
+      '- No `any` types — use Page and Locator from @playwright/test',
+      '- Every test.describe must use beforeEach to call page.goto(url)',
+      '- No getAllByRole — use getByRole(...) instead; prefer getByTestId()',
+      '- No hardcoded element counts — use toBeGreaterThan(0) for dynamic lists',
+      '- Use relative paths (e.g. /bailey/chat), not absolute https:// URLs',
       '- 5+ tests: load, elements, click date, time slots, mobile',
       '- Page Object Model pattern',
-      '- Return ONLY TypeScript, no markdown fences'
+      '- Return ONLY TypeScript code, no markdown fences, no explanations'
     ];
 
     console.log('🤖 Generating tests from real page data...\n');
 
-    const result = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+    const result = await groqChat({
+      model: MODELS.text,
       messages: [
         {
           role: 'system',
@@ -145,6 +142,9 @@ async function generateTests(url: string) {
     }
 
     const outputPath = path.join(process.cwd(), 'tests', 'ai-generated.spec.ts');
+    if (fs.existsSync(outputPath)) {
+      console.log(`⚠️  Warning: overwriting existing file: ${outputPath}`);
+    }
     fs.writeFileSync(outputPath, code);
 
     console.log('✅ Tests generated successfully!');
@@ -154,23 +154,13 @@ async function generateTests(url: string) {
     console.log('...\n');
 
   } catch (err) {
-    if (err instanceof Error) {
-      console.error('\n❌ Test generation failed:', err.message);
-      if (err.message.includes('API key')) {
-        console.error('💡 Add GROQ_API_KEY=your_key to your .env file');
-      } else if (err.message.includes('URL')) {
-        console.error('💡 Usage: npx tsx ai-tools/generate-tests.ts https://example.com');
-      } else if (err.message.includes('load')) {
-        console.error('💡 Check the URL is publicly accessible');
-      } else {
-        console.error('💡 Check your network connection and API key validity');
-      }
-    } else {
-      console.error('\n❌ Unexpected error:', err);
-    }
-    process.exit(1);
+    handleToolError(err, {
+      'API key': 'Add GROQ_API_KEY=your_key to your .env file',
+      'URL': 'Usage: npx tsx ai-tools/generate-tests.ts https://example.com',
+      'load': 'Check the URL is publicly accessible',
+    });
   }
 }
 
-const url = process.argv[2] || 'https://cal.com/bailey/chat';
+const url = process.argv[2] || DEFAULT_TARGET_URL;
 generateTests(url);

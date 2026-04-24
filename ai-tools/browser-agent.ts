@@ -1,12 +1,7 @@
-import * as dotenv from 'dotenv';
-import Groq from 'groq-sdk';
+import { groqChat, MODELS } from './groq-client';
+import { ensureDir, parseAIJson, saveReport } from './tool-utils';
 import { chromium } from '@playwright/test';
-import * as fs from 'fs';
 import * as path from 'path';
-
-dotenv.config();
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 interface AgentAction {
   action: 'click' | 'fill' | 'navigate' | 'scroll' | 'done' | 'fail';
@@ -23,14 +18,20 @@ async function decideNextAction(
   currentUrl: string,
   history: string[]
 ): Promise<AgentAction> {
-  const result = await groq.chat.completions.create({
-    model: 'llama-3.3-70b-versatile',
+  const result = await groqChat({
+    model: MODELS.text,
     messages: [
       {
         role: 'system',
         content: `You are an autonomous QA agent controlling a browser to test a web application.
 You receive the current page's text content and URL, and must decide the next action.
-Always respond with a valid JSON object only — no markdown, no explanation.`
+Always respond with a valid JSON object only — no markdown, no explanation.
+
+CRITICAL RULES:
+- If you can see time slots (e.g. "11:00pm", "3:00pm", "10:15am") in PAGE TEXT or INTERACTIVE ELEMENTS, the goal is achieved — respond with action "done".
+- If the last 3 history entries all took the same action for the same reason, you are in a loop — respond with action "done" or "fail".
+- Prefer month_view over week_view when trying to select a date; week_view rarely exposes individual date buttons.
+- Use action "done" as soon as the goal is verifiably met — do not keep clicking unnecessarily.`
       },
       {
         role: 'user',
@@ -57,14 +58,54 @@ Decide the next action. Respond with ONLY a JSON object in this exact format:
     ]
   });
 
-  const raw = result.choices[0].message.content!.trim();
-  try {
-    return JSON.parse(raw);
-  } catch {
-    // If JSON parsing fails, extract JSON from the response
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (match) return JSON.parse(match[0]);
-    throw new Error(`Could not parse AI response: ${raw}`);
+  return parseAIJson<AgentAction>(result.choices[0].message.content!);
+}
+
+function isSafeSelector(selector: string | undefined): selector is string {
+  if (!selector || selector.trim().length === 0) return false;
+  if (selector.length > 500) return false;
+  // Reject patterns commonly associated with injection attacks
+  return !/<script|javascript:|on\w+\s*=|<iframe/i.test(selector);
+}
+
+/**
+ * Attempts to click an element using a cascade of Playwright strategies.
+ * Tries role, text, testid, button text, and raw CSS selector in order.
+ */
+async function tryClick(page: import('@playwright/test').Page, selector: string, cleanText: string): Promise<void> {
+  const testIdMatch = selector.match(/data-testid=['"](.*?)['"]/);
+  const hrefMatch = selector.match(/href=['"](.*?)['"]/);
+
+  if (hrefMatch) {
+    await page.goto(hrefMatch[1]);
+    return;
+  }
+  if (testIdMatch) {
+    await page.getByTestId(testIdMatch[1]).and(page.locator(':not([disabled])')).first().click({ timeout: 3000 });
+    return;
+  }
+
+  const strategies: (() => Promise<void>)[] = [
+    () => page.getByRole('button', { name: cleanText, exact: false }).first().click({ timeout: 3000 }),
+    () => page.getByText(cleanText, { exact: false }).first().click({ timeout: 3000 }),
+    () => page.getByTestId('day').filter({ hasText: new RegExp(`^${cleanText}`) }).first().click({ timeout: 3000 }),
+    () => page.locator('button', { hasText: new RegExp(`^${cleanText}$`) }).first().click({ timeout: 3000 }),
+    () => {
+      if (!isSafeSelector(selector)) {
+        console.log(`⚠️  Unsafe selector rejected: ${selector}`);
+        return Promise.resolve();
+      }
+      return page.locator(selector).first().click({ timeout: 3000 });
+    },
+  ];
+
+  for (const strategy of strategies) {
+    try {
+      await strategy();
+      return;
+    } catch {
+      // try next strategy
+    }
   }
 }
 
@@ -73,13 +114,13 @@ async function runAgent(goal: string, startUrl: string, maxSteps = 8) {
   console.log(`📋 Goal: ${goal}`);
   console.log(`🌐 Starting at: ${startUrl}\n`);
 
-  const browser = await chromium.launch({ headless: false }); // headless: false so you can watch
+  const browser = await chromium.launch({ headless: process.env.CI ? true : !process.env.PWDEBUG });
   const page = await browser.newPage();
   await page.goto(startUrl);
 
   const history: string[] = [];
   const screenshotsDir = path.join(process.cwd(), 'agent-screenshots');
-  if (!fs.existsSync(screenshotsDir)) fs.mkdirSync(screenshotsDir);
+  ensureDir(screenshotsDir);
 
   for (let step = 1; step <= maxSteps; step++) {
     console.log(`\n--- Step ${step}/${maxSteps} ---`);
@@ -95,10 +136,20 @@ async function runAgent(goal: string, startUrl: string, maxSteps = 8) {
       return `[${el.tagName}] text="${text}" ${href ? `href="${href}"` : ''} ${testId ? `data-testid="${testId}"` : ''}`;
     })
     .filter(s => s.includes('text="') && !s.includes('text=""') && !s.includes('disabled'))
-    .slice(0, 30)
+    .slice(0, 50)
     .join('\n');
 
-  return `INTERACTIVE ELEMENTS:\n${interactive}\n\nPAGE TEXT:\n${document.body.innerText.substring(0, 1000)}`;
+  // Explicitly surface time slot buttons so the AI recognises completion
+  const timeSlots = Array.from(document.querySelectorAll('[data-testid="time"]'))
+    .map(el => (el as HTMLElement).innerText?.trim())
+    .filter(Boolean)
+    .slice(0, 10);
+
+  const timeSlotsSection = timeSlots.length > 0
+    ? `\n\nTIME SLOTS VISIBLE: ${timeSlots.join(', ')}`
+    : '';
+
+  return `INTERACTIVE ELEMENTS:\n${interactive}\n\nPAGE TEXT:\n${document.body.innerText.substring(0, 1000)}${timeSlotsSection}`;
 });
     const screenshotPath = path.join(screenshotsDir, `step-${step}.png`);
     await page.screenshot({ path: screenshotPath });
@@ -120,38 +171,40 @@ async function runAgent(goal: string, startUrl: string, maxSteps = 8) {
     // Execute the action
     try {
       switch (action.action) {
-        case 'navigate':
-          await page.goto(action.url!);
-          break;
-
-        case 'click':
-            // Extract clean text from AI selector like BUTTON[text='14 Today']
-            const textMatch = action.selector!.match(/text=['"](.*?)['"]/) || 
-                              action.selector!.match(/BUTTON\[text=['"]?(.*?)['"]?\]/);            const cleanText = textMatch ? textMatch[1] : action.selector!;
-            const testIdMatch = action.selector!.match(/data-testid=['"](.*?)['"]/);
-            const hrefMatch = action.selector!.match(/href=['"](.*?)['"]/);
-            try {
-                if (hrefMatch) {
-                    // Navigate directly instead of clicking the link
-                    await page.goto(hrefMatch[1]);
-                } else if (testIdMatch) {
-                    await page.getByTestId(testIdMatch[1]).and(page.locator(':not([disabled])')).first().click({ timeout: 3000 });
-                } else {
-                    await page.getByRole('button', { name: cleanText, exact: false })
-                    .first().click({ timeout: 3000 });
-                }
-                } catch {
-                    try {
-                        await page.getByText(cleanText, { exact: false }).first().click({ timeout: 3000 });
-                    } catch {
-                        await page.locator(action.selector!).first().click({ timeout: 3000 });
-                    }
-                }
-            await page.waitForTimeout(1500);
+        case 'navigate': {
+          if (!action.url) { console.log('⚠️  navigate action missing url, skipping'); break; }
+          // Resolve relative URLs (e.g. /bailey/chat) against startUrl
+          const resolvedNavUrl = (() => {
+            try { return new URL(action.url!); } catch {
+              try { return new URL(action.url!, startUrl); } catch { return null; }
+            }
+          })();
+          if (!resolvedNavUrl) { console.log(`⚠️  Invalid navigate URL: ${action.url}, skipping`); break; }
+          const allowedHost = new URL(startUrl).hostname;
+          if (resolvedNavUrl.hostname !== allowedHost) {
+            console.log(`⚠️  SSRF: navigate to ${resolvedNavUrl.hostname} blocked (only ${allowedHost} allowed)`);
             break;
+          }
+          await page.goto(resolvedNavUrl.toString());
+          break;
+        }
+
+        case 'click': {
+            // Extract clean text from AI selector like BUTTON[text='14 Today'] or BUTTON[text='25']
+            const textMatch = action.selector!.match(/text=['"](.*?)['"]/) ||
+                              action.selector!.match(/BUTTON\[text=['"]?(.*?)['"]?\]/);
+            const cleanText = textMatch ? textMatch[1] : action.selector!;
+            await tryClick(page, action.selector!, cleanText);
+            await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+            break;
+        }
 
         case 'fill':
-          await page.locator(action.selector!).first().fill(action.value!);
+          if (isSafeSelector(action.selector)) {
+            await page.locator(action.selector).first().fill(action.value!);
+          } else {
+            console.log(`⚠️  Unsafe selector rejected for fill: ${action.selector}`);
+          }
           break;
 
         case 'scroll':
@@ -206,13 +259,11 @@ Screenshots saved to: ${screenshotsDir}
 *Generated by AI-Native QA Toolkit*
 `;
 
-  const reportPath = path.join(process.cwd(), 'agent-report.md');
-  fs.writeFileSync(reportPath, report);
-  console.log(`\n📄 Report saved to: agent-report.md`);
+  saveReport('agent-report.md', report);
 }
 
 // Run the agent
 const goal = process.argv[2] || 'Verify that a user can navigate from the profile page to the booking calendar and see available time slots';
-const startUrl = process.argv[3] || 'https://cal.com/bailey';
+const startUrl = process.argv[3] || `${process.env.BASE_URL || 'https://cal.com'}/bailey`;
 
 runAgent(goal, startUrl).catch(console.error);

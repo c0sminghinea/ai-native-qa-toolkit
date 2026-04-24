@@ -53,12 +53,7 @@ qa-playwright/
   visual-regression/        # Screenshots from visual regression runs
   persona-screenshots/      # Screenshots from persona engine runs
   agent-screenshots/        # Screenshots from autonomous agent runs
-  coverage-report.md        # Latest coverage advisory output
-  persona-report.md         # Latest persona engine report
-  agent-report.md           # Latest autonomous agent report
-  visual-regression-report.md  # Latest visual regression report
-  data-consistency-report.md   # Latest data consistency report
-  cdp-report.md                # Latest CDP inspector report
+  # Generated reports (*-report.md) are gitignored — created by each tool run
   mcp-server.ts                # MCP server exposing all tools to LLM clients
   mcp-config.json              # MCP client configuration for Claude Code/Cursor
   mcp-playwright-demo.ts       # Official @playwright/mcp server demo — LLM-controlled browser
@@ -79,13 +74,16 @@ Firefox, and WebKit — 12 tests, all passing.
 - **Self-healing selectors** — fallback locator strategies prevent brittle tests
 - **Cross-browser** — Chromium, Firefox, WebKit
 - **Mobile viewport** — responsive design validated at 375×812 (iPhone X)
-- **Trace Viewer** — full step-by-step traces captured for every test run
+- **Trace Viewer** — traces captured on first retry and retained on failure
 
 ### Run tests
 
 ```bash
 # All browsers
 npx playwright test
+
+# AI-generated tests only (Chromium)
+npm run test:ai-generated
 
 # Specific file
 npx playwright test tests/booking-flow.spec.ts
@@ -453,11 +451,31 @@ npx playwright install
 
 ### Configure
 
-Create a `.env` file in the project root:
+Copy `.env.example` to `.env` and fill in your values:
+
+```bash
+cp .env.example .env
+```
 
 ```env
-GROQ_API_KEY=your_key_here
+GROQ_API_KEY=your_key_here       # Required — get it free from console.groq.com
+BASE_URL=https://cal.com         # Optional — target URL for tests and tools (default: https://cal.com)
+HOST_NAME=Bailey Pumfleet        # Optional — expected host name in assertions
 ```
+
+---
+
+## CI
+
+A GitHub Actions workflow runs the full test suite on every push and pull request:
+
+```yaml
+# .github/workflows/playwright.yml
+# Triggers: push/PR to main and develop
+# Steps: install deps → install browsers → run tests → upload report
+```
+
+Test reports and traces are uploaded as artifacts under the `playwright-report` artifact name.
 
 ---
 

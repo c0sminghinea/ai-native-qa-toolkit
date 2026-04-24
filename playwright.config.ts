@@ -2,11 +2,12 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
-  testIgnore: ['**/ai-generated.spec.ts'],
+  // ai-generated.spec.ts is produced by `npm run generate-tests` — run it explicitly with `npm run test:ai-generated`
+  testIgnore: process.env.RUN_AI_GENERATED ? [] : ['**/ai-generated.spec.ts'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 1,
-  workers: process.env.CI ? 1 : undefined,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 2 : undefined,
 
   reporter: [
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
@@ -15,9 +16,10 @@ export default defineConfig({
   ],
 
   use: {
-    trace: 'on',          // Capture trace for every test run
-    screenshot: 'on',     // Screenshot on every test
-    video: 'retain-on-failure', // Video only when test fails
+    baseURL: process.env.BASE_URL || 'https://cal.com',
+    trace: process.env.CI ? 'on-first-retry' : 'retain-on-failure',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
   },
 
   projects: [

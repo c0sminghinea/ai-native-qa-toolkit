@@ -1,18 +1,32 @@
 {
   "name": "qa-playwright",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "AI-native QA toolkit for Playwright",
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:debug": "playwright test --debug",
     "test:report": "playwright show-report",
     "build": "tsc",
-    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "visual-regression": "tsx ai-tools/visual-regression.ts",
     "analyze-failure": "tsx ai-tools/analyze-failure.ts",
-    "mcp-server": "tsx mcp-server.ts"
+    "browser-agent": "tsx ai-tools/browser-agent.ts",
+    "coverage-advisor": "tsx ai-tools/coverage-advisor.ts",
+    "cdp-inspector": "tsx ai-tools/cdp-inspector.ts",
+    "data-consistency": "tsx ai-tools/data-consistency.ts",
+    "generate-tests": "tsx ai-tools/generate-tests.ts",
+    "persona-engine": "tsx ai-tools/persona-engine.ts",
+    "mcp-server": "tsx mcp-server.ts",
+    "test:ai-generated": "RUN_AI_GENERATED=1 playwright test tests/ai-generated.spec.ts --project=chromium",
+    "test:chromium": "playwright test --project=chromium",
+    "test:firefox": "playwright test --project=firefox",
+    "test:webkit": "playwright test --project=webkit",
+    "clean": "rm -rf dist"
   },
   "keywords": [],
   "author": "",
@@ -21,14 +35,18 @@
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@types/node": "^25.5.0",
+    "@typescript-eslint/eslint-plugin": "^8.59.0",
+    "@typescript-eslint/parser": "^8.59.0",
+    "eslint": "^9.39.4",
+    "prettier": "^3.8.3",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@playwright/mcp": "^0.0.68",
     "dotenv": "^17.3.1",
-    "groq-sdk": "^1.1.1"
+    "groq-sdk": "^1.1.1",
+    "zod": "^4.3.6"
   }
 }

@@ -1,0 +1,9 @@
+node_modules
+dist
+playwright-report
+test-results
+visual-regression
+persona-screenshots
+agent-screenshots
+*.md
+package-lock.json

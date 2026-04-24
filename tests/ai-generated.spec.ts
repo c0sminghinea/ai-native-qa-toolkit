@@ -1,136 +1,68 @@
 import { test, expect } from '@playwright/test';
-
-class ChatPage {
-  private page: any;
-
-  constructor(page: any) {
-    this.page = page;
-  }
-
-  get bookerContainer() {
-    return this.page.getByTestId('booker-container');
-  }
-
-  get overlayCalendarSwitch() {
-    return this.page.getByTestId('overlay-calendar-switch');
-  }
-
-  get toggleGroupItemMonthView() {
-    return this.page.getByRole('button', { name: '$Switch to monthly view' });
-  }
-
-  get toggleGroupItemWeekView() {
-    return this.page.getByRole('button', { name: '$Switch to weekly view' });
-  }
-
-  get toggleGroupItemColumnView() {
-    return this.page.getByRole('button', { name: '$Switch to column view' });
-  }
-
-  get calendarIcon() {
-    return this.page.getByTestId('calendar-icon');
-  }
-
-  get grid3x3Icon() {
-    return this.page.getByTestId('grid-3x3-icon');
-  }
-
-  get columns3Icon() {
-    return this.page.getByTestId('columns-3-icon');
-  }
-
-  get eventMeta() {
-    return this.page.getByTestId('event-meta');
-  }
-
-  get avatarHref() {
-    return this.page.getByTestId('avatar-href');
-  }
-
-  get avatar() {
-    return this.page.getByTestId('avatar');
-  }
-
-  get eventTitle() {
-    return this.page.getByTestId('event-title');
-  }
-
-  get eventMetaDescription() {
-    return this.page.getByTestId('event-meta-description');
-  }
-
-  get eventMetaCurrentTimezone() {
-    return this.page.getByTestId('event-meta-current-timezone');
-  }
-
-  get timezoneSelect() {
-    return this.page.getByTestId('timezone-select');
-  }
-
-  get selectedMonthLabel() {
-    return this.page.getByTestId('selected-month-label');
-  }
-
-  get decrementMonth() {
-    return this.page.getByRole('button', { name: '' });
-  }
-
-  get incrementMonth() {
-    return this.page.getByRole('button', { name: '' });
-  }
-
-  dayButton(dayNumber: string) {
-    return this.page.getByRole('button', { name: dayNumber });
-  }
-
-  get toggleGroupItemHmma() {
-    return this.page.getByRole('button', { name: '12h' });
-  }
-
-  get toggleGroupItemHhmm() {
-    return this.page.getByRole('button', { name: '24h' });
-  }
-
- timeButton(time: string) {
-    return this.page.getByRole('button', { name: time });
-  }
-}
+import { BookingPage, DEFAULT_HOST_NAME } from './pages/BookingPage';
 
 test.describe('Chat Page', () => {
-  test('loads correctly', async ({ page }) => {
-    const chatPage = new ChatPage(page);
-    await page.goto('https://i.cal.com/bailey/chat?user=bailey&type=chat&orgRedirection=true');
-    await expect(chatPage.bookerContainer).toBeVisible();
+  let bookingPage: BookingPage;
+
+  test.beforeEach(async ({ page }) => {
+    bookingPage = new BookingPage(page);
+    await bookingPage.goto();
   });
 
-  test('contains required elements', async ({ page }) => {
-    const chatPage = new ChatPage(page);
-    await page.goto('https://i.cal.com/bailey/chat?user=bailey&type=chat&orgRedirection=true');
-    await expect(chatPage.bookerContainer).toBeVisible();
-    await expect(chatPage.eventMeta).toBeVisible();
-    await expect(chatPage.eventTitle).toBeVisible();
-    await expect(chatPage.eventMetaDescription).toBeVisible();
+  test('should load chat page with correct title', async ({ page }) => {
+    await expect(page).toHaveTitle(new RegExp(DEFAULT_HOST_NAME));
   });
 
-  test('click date button', async ({ page }) => {
-    const chatPage = new ChatPage(page);
-    await page.goto('https://i.cal.com/bailey/chat?user=bailey&type=chat&orgRedirection=true');
-    await chatPage.dayButton('20').click();
-    await expect(chatPage.bookerContainer).toBeVisible();
+  test('should display key booking elements', async () => {
+    await expect(bookingPage.bookerContainer).toBeVisible();
+    await expect(bookingPage.eventTitle).toBeVisible();
+    await expect(bookingPage.eventMeta).toBeVisible();
+    await expect(bookingPage.monthLabel).toBeVisible();
+    await expect(bookingPage.timezoneSelect).toBeVisible();
+    await expect(bookingPage.overlayCalendarSwitch).toBeVisible();
   });
 
-  test('click time slot button', async ({ page }) => {
-    const chatPage = new ChatPage(page);
-    await page.goto('https://i.cal.com/bailey/chat?user=bailey&type=chat&orgRedirection=true');
-    await chatPage.timeButton('10:00pm').click();
-    await expect(chatPage.bookerContainer).toBeVisible();
+  test('should display calendar with selectable days', async () => {
+    await expect(bookingPage.firstAvailableDay).toBeVisible();
+    const count = await bookingPage.availableDays.count();
+    expect(count).toBeGreaterThan(0);
   });
 
-  test('works correctly on mobile', async ({ page }) => {
-    const chatPage = new ChatPage(page);
-    await page.goto('https://i.cal.com/bailey/chat?user=bailey&type=chat&orgRedirection=true');
-    await page.evaluate('_ => _.window.innerWidth = 480');
-    await page.evaluate('_ => _.window.innerHeight = 640');
-    await expect(chatPage.bookerContainer).toBeVisible();
+  test('should show time slots after clicking a day', async () => {
+    await bookingPage.selectFirstAvailableDate();
+    await expect(bookingPage.firstTimeSlot).toBeVisible({ timeout: 8000 });
+  });
+
+  test('should advance calendar to next month', async () => {
+    const initialMonth = await bookingPage.monthLabel.textContent();
+    await bookingPage.nextMonthButton.click();
+    await expect(bookingPage.monthLabel).not.toHaveText(initialMonth!);
+  });
+
+  test('should go back to previous month', async () => {
+    await bookingPage.nextMonthButton.click();
+    const forwardMonth = await bookingPage.monthLabel.textContent();
+    await bookingPage.prevMonthButton.click();
+    await expect(bookingPage.monthLabel).not.toHaveText(forwardMonth!);
+  });
+
+  test('should display 12h / 24h toggle after date selection', async () => {
+    await bookingPage.selectFirstAvailableDate();
+    await expect(bookingPage.timeToggle12h).toBeVisible({ timeout: 8000 });
+    await expect(bookingPage.timeToggle24h).toBeVisible({ timeout: 8000 });
+  });
+
+  test('should be responsive on mobile viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await bookingPage.goto();
+    await expect(bookingPage.bookerContainer).toBeVisible();
+    await expect(bookingPage.eventTitle).toBeVisible();
+  });
+
+  test('should open booking form after selecting a time slot', async () => {
+    await bookingPage.selectFirstAvailableDate();
+    const slotSelected = await bookingPage.selectFirstAvailableTimeSlot();
+    if (!slotSelected) { test.skip(true, 'No time slots available — skipping form check'); return; }
+    await expect(bookingPage.nameField).toBeVisible({ timeout: 5000 });
   });
 });

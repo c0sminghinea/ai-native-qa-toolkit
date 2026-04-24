@@ -1,24 +1,25 @@
 #!/usr/bin/env npx tsx
 
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import * as path from 'path';
 
 const args = process.argv.slice(2);
 const command = args[0];
-const rest = args.slice(1).join(' ');
+// Keep extra args as an array — never interpolate user input into a shell string
+const extraArgs = args.slice(1);
 
-const tools: Record<string, string> = {
-  'generate':    `npx tsx ai-tools/generate-tests.ts ${rest}`,
-  'analyze':     `npx tsx ai-tools/analyze-failure.ts ${rest}`,
-  'coverage':    `npx tsx ai-tools/coverage-advisor.ts ${rest}`,
-  'visual':      `npx tsx ai-tools/visual-regression.ts ${rest}`,
-  'agent':       `npx tsx ai-tools/browser-agent.ts ${rest}`,
-  'personas':    `npx tsx ai-tools/persona-engine.ts ${rest}`,
-  'consistency': `npx tsx ai-tools/data-consistency.ts ${rest}`,
-  'cdp':         `npx tsx ai-tools/cdp-inspector.ts ${rest}`,
-  'mcp':         `npx tsx mcp-playwright-demo.ts ${rest}`,
-  'test':        `npx playwright test ${rest}`,
-  'report':      `npx playwright show-report`,
+const toolCommands: Record<string, string[]> = {
+  'generate':    ['npx', 'tsx', 'ai-tools/generate-tests.ts', ...extraArgs],
+  'analyze':     ['npx', 'tsx', 'ai-tools/analyze-failure.ts', ...extraArgs],
+  'coverage':    ['npx', 'tsx', 'ai-tools/coverage-advisor.ts', ...extraArgs],
+  'visual':      ['npx', 'tsx', 'ai-tools/visual-regression.ts', ...extraArgs],
+  'agent':       ['npx', 'tsx', 'ai-tools/browser-agent.ts', ...extraArgs],
+  'personas':    ['npx', 'tsx', 'ai-tools/persona-engine.ts', ...extraArgs],
+  'consistency': ['npx', 'tsx', 'ai-tools/data-consistency.ts', ...extraArgs],
+  'cdp':         ['npx', 'tsx', 'ai-tools/cdp-inspector.ts', ...extraArgs],
+  'mcp':         ['npx', 'tsx', 'mcp-playwright-demo.ts', ...extraArgs],
+  'test':        ['npx', 'playwright', 'test', ...extraArgs],
+  'report':      ['npx', 'playwright', 'show-report'],
 };
 
 const descriptions: Record<string, string> = {
@@ -52,14 +53,20 @@ if (!command || command === 'help' || command === '--help') {
   process.exit(0);
 }
 
-if (!tools[command]) {
+if (!toolCommands[command]) {
   console.error(`\n❌ Unknown command: "${command}"`);
   console.error('   Run "npx tsx cli.ts help" to see available commands\n');
   process.exit(1);
 }
 
 try {
-  execSync(tools[command], { stdio: 'inherit', cwd: path.resolve(__dirname) });
+  const [bin, ...binArgs] = toolCommands[command];
+  const result = spawnSync(bin, binArgs, {
+    stdio: 'inherit',
+    cwd: path.resolve(__dirname),
+    shell: false,
+  });
+  if (result.status !== 0) process.exit(result.status ?? 1);
 } catch (err) {
   process.exit(1);
 }

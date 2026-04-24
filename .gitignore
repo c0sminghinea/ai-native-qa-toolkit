@@ -8,3 +8,5 @@ visual-regression/
 *.zip
 dist/
 mcp-config.json
+*-report.md
+.DS_Store

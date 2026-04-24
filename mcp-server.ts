@@ -1,15 +1,10 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import Groq from 'groq-sdk';
+import { groqChat, MODELS } from './ai-tools/groq-client';
 import { chromium } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as dotenv from 'dotenv';
-
-dotenv.config();
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const server = new McpServer({
   name: 'ai-native-qa-toolkit',
   version: '1.0.0',
@@ -24,8 +19,8 @@ server.tool(
     test_code: z.string().optional().describe('The test code that produced the error (optional)'),
   },
   async ({ error_log, test_code }) => {
-    const result = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+    const result = await groqChat({
+      model: MODELS.text,
       messages: [
         {
           role: 'system',
@@ -63,6 +58,13 @@ server.tool(
   async ({ test_file_path }) => {
     const resolvedPath = path.resolve(process.cwd(), test_file_path);
 
+    const workspaceRoot = process.cwd() + path.sep;
+    if (!resolvedPath.startsWith(workspaceRoot)) {
+      return {
+        content: [{ type: 'text', text: 'Error: path outside workspace is not permitted' }]
+      };
+    }
+
     if (!fs.existsSync(resolvedPath)) {
       return {
         content: [{ type: 'text', text: `Error: File not found at ${resolvedPath}` }]
@@ -71,8 +73,8 @@ server.tool(
 
     const testCode = fs.readFileSync(resolvedPath, 'utf-8');
 
-    const result = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+    const result = await groqChat({
+      model: MODELS.text,
       messages: [
         {
           role: 'system',
@@ -117,53 +119,107 @@ TOP 3 TESTS TO ADD:
   }
 );
 
+// ─── Helper: scrape interactive elements from a live page ─────────────────
+async function explorePage(url: string) {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await (await browser.newContext()).newPage();
+    await page.goto(url, { timeout: 15000 });
+    await page.waitForTimeout(2000);
+
+    const data = await page.evaluate(() => {
+      const testIds = Array.from(document.querySelectorAll('[data-testid]'))
+        .filter(el => (el as HTMLElement).offsetParent !== null)
+        .map(el => ({
+          testId: el.getAttribute('data-testid'),
+          tag: el.tagName,
+          text: ((el as HTMLElement).innerText || '').trim().substring(0, 50),
+        }));
+
+      const buttons = Array.from(document.querySelectorAll('button:not([disabled])'))
+        .map(el => ({
+          text: ((el as HTMLElement).innerText || '').trim().substring(0, 50),
+          testId: el.getAttribute('data-testid'),
+        }))
+        .filter(b => b.text);
+
+      const headings = Array.from(document.querySelectorAll('h1,h2,h3'))
+        .map(el => ({ tag: el.tagName, text: ((el as HTMLElement).innerText || '').trim().substring(0, 50) }));
+
+      return { testIds, buttons, headings };
+    });
+
+    return { url: page.url(), title: await page.title(), ...data };
+  } finally {
+    await browser.close();
+  }
+}
+
 // ─── Tool 3: Generate Tests ───────────────────────────────────────────────
 server.tool(
   'generate_tests',
-  'Generates a complete Playwright TypeScript test file for any URL',
+  'Explores a URL using a real browser then generates a grounded Playwright TypeScript test file',
   {
     url: z.string().describe('The URL of the page to generate tests for'),
     output_path: z.string().optional().describe('Where to save the generated test file (optional)'),
   },
   async ({ url, output_path }) => {
-    const result = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are an expert QA engineer specializing in Playwright E2E testing. Return ONLY TypeScript code, no explanations, no markdown fences.'
-        },
-        {
-          role: 'user',
-          content: `Generate a complete, production-ready Playwright TypeScript test file for this URL: ${url}
+    if (!url.startsWith('http')) {
+      return { content: [{ type: 'text', text: 'Error: URL must start with http or https' }] };
+    }
 
-Requirements:
-- Use Page Object Model pattern
-- Include at least 5 meaningful test cases
-- Cover: page load, key UI elements, interactions, mobile viewport
-- Use data-testid selectors where possible, fall back to getByRole and getByText
-- Include self-healing fallback selectors using try/catch
-- Add descriptive comments explaining what each test validates`
-        }
-      ]
+    let pageData: Awaited<ReturnType<typeof explorePage>>;
+    try {
+      pageData = await explorePage(url);
+    } catch (err) {
+      return {
+        content: [{ type: 'text', text: `Error exploring page: ${err instanceof Error ? err.message : String(err)}` }],
+      };
+    }
+
+    const lines = [
+      `Generate a Playwright TypeScript test file for: ${pageData.url}`,
+      `Title: ${pageData.title}`,
+      '',
+      'DATA-TESTID ELEMENTS:',
+      ...pageData.testIds.map(e => `- data-testid="${e.testId}" ${e.tag} "${e.text}"`),
+      '',
+      'BUTTONS:',
+      ...pageData.buttons.map(b => `- "${b.text}"${b.testId ? ` [data-testid="${b.testId}"]` : ''}`),
+      '',
+      'HEADINGS:',
+      ...pageData.headings.map(h => `- ${h.tag}: "${h.text}"`),
+      '',
+      'Rules:',
+      '- Use ONLY selectors listed above',
+      '- getByTestId() for data-testid elements',
+      '- getByRole("button", { name }) for buttons',
+      '- 5+ tests: load, elements, click date, time slots, mobile',
+      '- Page Object Model pattern',
+      '- Return ONLY TypeScript, no markdown fences',
+    ];
+
+    const result = await groqChat({
+      model: MODELS.text,
+      messages: [
+        { role: 'system', content: 'Expert QA engineer. Return ONLY TypeScript, no markdown.' },
+        { role: 'user', content: lines.join('\n') },
+      ],
+      max_tokens: 3000,
     });
 
-    const code = result.choices[0].message.content!;
+    let code = result.choices[0].message.content!.trim();
+    code = code.replace(/^```typescript\n?|^```\n?|```$/gm, '').trim();
 
     if (output_path) {
       const resolvedPath = path.resolve(process.cwd(), output_path);
       fs.writeFileSync(resolvedPath, code);
       return {
-        content: [{
-          type: 'text',
-          text: `Tests generated and saved to ${resolvedPath}\n\n${code}`
-        }]
+        content: [{ type: 'text', text: `Tests generated and saved to ${resolvedPath}\n\n${code}` }],
       };
     }
 
-    return {
-      content: [{ type: 'text', text: code }]
-    };
+    return { content: [{ type: 'text', text: code }] };
   }
 );
 
@@ -198,8 +254,8 @@ server.tool(
       const imageData = fs.readFileSync(screenshotPath);
       const base64Image = imageData.toString('base64');
 
-      const result = await groq.chat.completions.create({
-        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      const result = await groqChat({
+        model: MODELS.vision,
         messages: [{
           role: 'user',
           content: [

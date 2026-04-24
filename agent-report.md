@@ -2,17 +2,11 @@
 
 **Goal:** Verify that a user can navigate from the profile page to the booking calendar and see available time slots  
 **Result:** ✅ Passed  
-**Finding:** Available time slots for booking on March 20, 2026, are visible
+**Finding:** available time slots, such as 5:00pm, 5:15pm, 9:00pm, etc.
 
 ## Steps Taken
-1. Step 1: click — To navigate from the profile page to the booking calendar and see available time slots, we need to click on one of the event type links.
-2. Step 2: click — To select a day and view available time slots
-3. Step 3: click — To select a day and view available time slots
-4. Step 4: click — To select the day and view available time slots for booking
-5. Step 5: click — To view available time slots for booking on a specific day
-6. Step 6: click — To select the day 20 and view available time slots for booking
-7. Step 7: click — To verify available time slots for booking on the selected day
-8. Step 8: done — Available time slots for booking on the selected day are visible
+1. Step 1: click — To navigate to the booking calendar and potentially see available time slots
+2. Step 2: done — time slots are visible in the page content
 
 ## Screenshots
 Screenshots saved to: /Users/cosmin/Desktop/qa-playwright/agent-screenshots
