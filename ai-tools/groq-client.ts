@@ -11,13 +11,26 @@ const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, m
 
 dotenv.config({ quiet: true });
 
-if (!process.env.GROQ_API_KEY) {
-  throw new Error(
-    'GROQ_API_KEY is not set. Copy .env.example to .env and add your key from https://console.groq.com/'
-  );
+/**
+ * Lazily-constructed Groq client. We deliberately do NOT throw at module load
+ * if `GROQ_API_KEY` is missing — that would break `tsc --noEmit`, `vitest`,
+ * and any tooling in CI that imports a file which transitively imports this
+ * module. The key is required only when an actual API call is made.
+ */
+let groqInstance: Groq | null = null;
+function getGroq(): Groq {
+  if (groqInstance) return groqInstance;
+  if (!process.env.GROQ_API_KEY) {
+    throw new Error(
+      'GROQ_API_KEY is not set. Copy .env.example to .env and add your key from https://console.groq.com/'
+    );
+  }
+  groqInstance = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  return groqInstance;
 }
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+/** Type alias for the SDK's non-streaming create() params. */
+type ChatCreateParams = Parameters<Groq['chat']['completions']['create']>[0];
 
 export const MODELS = {
   text: 'llama-3.3-70b-versatile',
@@ -162,7 +175,7 @@ export function backoffDelay(attempt: number): number {
  * - GROQ_VERBOSE=1 — log token usage per call to stderr
  */
 export async function groqChat(
-  params: Omit<Parameters<typeof groq.chat.completions.create>[0], 'stream'>,
+  params: Omit<ChatCreateParams, 'stream'>,
   maxRetries = 3
 ): Promise<Groq.Chat.ChatCompletion> {
   installStatsHook();
@@ -181,7 +194,7 @@ export async function groqChat(
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const result = (await groq.chat.completions.create({
+      const result = (await getGroq().chat.completions.create({
         ...params,
         stream: false,
       })) as Groq.Chat.ChatCompletion;
@@ -227,7 +240,7 @@ export async function groqChat(
  * Retries the call once if the content does not parse or fails validation.
  */
 export async function groqChatJSON<T>(
-  params: Omit<Parameters<typeof groq.chat.completions.create>[0], 'stream'>,
+  params: Omit<ChatCreateParams, 'stream'>,
   schema: ZodSchema<T>,
   opener: '{' | '[' = '{'
 ): Promise<T> {
