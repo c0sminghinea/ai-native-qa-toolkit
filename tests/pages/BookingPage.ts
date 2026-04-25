@@ -89,8 +89,4 @@ export class BookingPage {
     if (appeared) await this.confirmButton.click();
     return appeared;
   }
-
-  async isCalendarVisible(): Promise<boolean> {
-    return this.monthLabel.isVisible();
-  }
 }

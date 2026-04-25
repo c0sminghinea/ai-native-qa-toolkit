@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { groqChat, MODELS } from './ai-tools/groq-client';
+import { sleep, ensureDir } from './ai-tools/tool-utils';
 import { chromium } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -246,7 +247,7 @@ server.tool(
       await page.waitForTimeout(2000);
 
       const dir = path.join(process.cwd(), 'visual-regression');
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir);
+      ensureDir(dir);
       const screenshotPath = path.join(dir, `mcp-${vp.name}.png`);
       await page.screenshot({ path: screenshotPath, fullPage: true });
       await browser.close();
@@ -272,12 +273,161 @@ server.tool(
       });
 
       analyses.push(`## ${vp.label}\n${result.choices[0].message.content}`);
-      await new Promise(r => setTimeout(r, 2000));
+      await sleep(2000);
     }
 
     return {
       content: [{ type: 'text', text: analyses.join('\n\n---\n\n') }]
     };
+  }
+);
+
+// ─── Tool 5: Data Consistency ─────────────────────────────────────────────
+server.tool(
+  'data_consistency',
+  'Checks that key data points are consistent across multiple pages derived from the target URL',
+  {
+    url: z.string().describe('The booking page URL (e.g. https://cal.com/user/event). A profile URL is derived automatically.'),
+    data_keys: z.array(z.string()).optional().describe('Data points to check (default: host name, event duration, meeting platform)'),
+  },
+  async ({ url, data_keys }) => {
+    if (!url.startsWith('http')) {
+      return { content: [{ type: 'text', text: 'Error: URL must start with http or https' }] };
+    }
+
+    const parsedUrl = new URL(url);
+    const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
+    const profileUrl = pathParts.length > 1
+      ? `${parsedUrl.origin}/${pathParts[0]}`
+      : url;
+
+    const keysToCheck = data_keys ?? ['host name', 'event duration', 'meeting platform'];
+    const pages = [
+      { name: 'Profile Page', url: profileUrl },
+      { name: 'Booking Page', url },
+    ];
+
+    const browser = await chromium.launch({ headless: true });
+    const lines: string[] = [`## Data Consistency Report\n\n**Booking URL:** ${url}\n`];
+
+    try {
+      for (const key of keysToCheck) {
+        const dataPoints: { page: string; value: string }[] = [];
+        for (const pg of pages) {
+          const context = await browser.newContext();
+          const page = await context.newPage();
+          try {
+            await page.goto(pg.url, { timeout: 15000 });
+            await sleep(2000);
+            const pageText = (await page.evaluate(() => document.body.innerText)).substring(0, 3000);
+            const extraction = await groqChat({
+              model: MODELS.text,
+              messages: [
+                { role: 'system', content: 'Extract a specific value from page content. Return ONLY the value or NOT_FOUND.' },
+                { role: 'user', content: `Extract "${key}" from:\n${pageText}\n\nReturn the value or NOT_FOUND.` },
+              ],
+            });
+            dataPoints.push({ page: pg.name, value: extraction.choices[0].message.content!.trim() });
+          } finally {
+            await context.close();
+          }
+        }
+
+        const found = dataPoints.filter(d => d.value !== 'NOT_FOUND');
+        const unique = [...new Set(found.map(d => d.value))];
+        const status = unique.length === 0 ? '⚠️ Not found' : unique.length === 1 ? '✅ Consistent' : '❌ Inconsistent';
+
+        lines.push(`**${key}**: ${status}`);
+        for (const dp of dataPoints) lines.push(`  - ${dp.page}: ${dp.value}`);
+        lines.push('');
+      }
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` }] };
+    } finally {
+      await browser.close();
+    }
+
+    return { content: [{ type: 'text', text: lines.join('\n') }] };
+  }
+);
+
+// ─── Tool 6: Locator Healer ───────────────────────────────────────────────
+server.tool(
+  'heal_locator',
+  'Navigates to a URL, snapshots the live DOM, and returns 5 AI-suggested replacement locators for a broken selector',
+  {
+    broken_selector: z.string().describe('The broken Playwright locator expression or a Playwright error message'),
+    url: z.string().describe('The URL to navigate to for live DOM context'),
+  },
+  async ({ broken_selector, url }) => {
+    if (!url.startsWith('http')) {
+      return { content: [{ type: 'text', text: 'Error: URL must start with http or https' }] };
+    }
+
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      await page.goto(url, { timeout: 15000 });
+      await sleep(2000);
+
+      const domContext = await page.evaluate(() => {
+        const testIds = Array.from(document.querySelectorAll('[data-testid]'))
+          .filter(el => (el as HTMLElement).offsetParent !== null)
+          .map(el => `  testid="${el.getAttribute('data-testid')}" <${el.tagName.toLowerCase()}> "${((el as HTMLElement).innerText || '').trim().substring(0, 60)}"`)
+          .slice(0, 20);
+        const headings = Array.from(document.querySelectorAll('h1,h2,h3'))
+          .map(el => `  <${el.tagName.toLowerCase()}> "${((el as HTMLElement).innerText || '').trim().substring(0, 60)}"`);
+        const buttons = Array.from(document.querySelectorAll('button:not([disabled])'))
+          .filter(el => (el as HTMLElement).offsetParent !== null)
+          .map(el => {
+            const testId = el.getAttribute('data-testid');
+            const text = ((el as HTMLElement).innerText || '').trim().substring(0, 50);
+            return `  [button]${testId ? ` testid="${testId}"` : ''} text="${text}"`;
+          })
+          .filter(b => !b.endsWith('text=""'))
+          .slice(0, 15);
+        return ['DATA-TESTID ELEMENTS:', ...testIds, '', 'HEADINGS:', ...headings, '', 'BUTTONS:', ...buttons].join('\n');
+      });
+
+      const result = await groqChat({
+        model: MODELS.text,
+        messages: [
+          {
+            role: 'system',
+            content: 'Expert Playwright engineer. Suggest 5 replacement locators for a broken selector. Preference: getByTestId > getByRole > getByText > locator. Return ONLY valid JSON, no markdown.',
+          },
+          {
+            role: 'user',
+            content: `BROKEN LOCATOR: ${broken_selector}\n\nCURRENT DOM:\n${domContext}\n\nReturn: { "suggestions": [{ "playwrightCode": "...", "description": "...", "confidence": "high|medium|low" }] }`,
+          },
+        ],
+      });
+
+      let suggestions: { playwrightCode: string; description: string; confidence: string }[] = [];
+      try {
+        const raw = result.choices[0].message.content!;
+        const match = raw.match(/\{[\s\S]*\}/);
+        const parsed = JSON.parse(match?.[0] ?? raw);
+        suggestions = parsed.suggestions ?? [];
+      } catch {
+        return { content: [{ type: 'text', text: `AI suggestions (raw):\n${result.choices[0].message.content}` }] };
+      }
+
+      const lines = [`## Locator Healing Suggestions\n\n**Broken:** \`${broken_selector}\`\n`];
+      suggestions.forEach((s, i) => {
+        lines.push(`${i + 1}. \`${s.playwrightCode}\``);
+        lines.push(`   - Confidence: ${s.confidence}`);
+        lines.push(`   - ${s.description}`);
+        lines.push('');
+      });
+
+      return { content: [{ type: 'text', text: lines.join('\n') }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` }] };
+    } finally {
+      await browser.close();
+    }
   }
 );
 

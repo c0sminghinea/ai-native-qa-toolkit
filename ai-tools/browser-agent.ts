@@ -1,5 +1,5 @@
 import { groqChat, MODELS } from './groq-client';
-import { ensureDir, parseAIJson, saveReport } from './tool-utils';
+import { ensureDir, isSafeSelector, parseAIJson, saveReport } from './tool-utils';
 import { chromium } from '@playwright/test';
 import * as path from 'path';
 
@@ -59,13 +59,6 @@ Decide the next action. Respond with ONLY a JSON object in this exact format:
   });
 
   return parseAIJson<AgentAction>(result.choices[0].message.content!);
-}
-
-function isSafeSelector(selector: string | undefined): selector is string {
-  if (!selector || selector.trim().length === 0) return false;
-  if (selector.length > 500) return false;
-  // Reject patterns commonly associated with injection attacks
-  return !/<script|javascript:|on\w+\s*=|<iframe/i.test(selector);
 }
 
 /**

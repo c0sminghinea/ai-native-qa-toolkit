@@ -1,15 +1,13 @@
 import { groqChat, MODELS } from './groq-client';
 import { ensureDir, saveReport, handleToolError, sleep, DEFAULT_TARGET_URL } from './tool-utils';
-import { chromium } from '@playwright/test';
+import { chromium, type Browser } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 
-async function captureScreenshot(url: string, name: string, viewport = { width: 1280, height: 720 }): Promise<string> {
-  const browser = await chromium.launch({ headless: true });
+async function captureScreenshot(browser: Browser, url: string, name: string, viewport = { width: 1280, height: 720 }): Promise<string> {
+  const context = await browser.newContext({ viewport });
+  const page = await context.newPage();
   try {
-    const context = await browser.newContext({ viewport });
-    const page = await context.newPage();
-
     await page.goto(url, { timeout: 15000 }).catch(() => {
       throw new Error(`Could not load URL: ${url} — check it is publicly accessible`);
     });
@@ -25,7 +23,7 @@ async function captureScreenshot(url: string, name: string, viewport = { width: 
     return screenshotPath;
 
   } finally {
-    await browser.close();
+    await context.close();
   }
 }
 
@@ -98,12 +96,14 @@ async function compareViewports(url: string) {
 
     const results: { viewport: string; score: string; analysis: string; screenshot: string }[] = [];
 
+    const browser = await chromium.launch({ headless: true });
+    try {
     for (const vp of viewports) {
       console.log(`📸 Capturing ${vp.label}...`);
 
       let screenshotPath: string;
       try {
-        screenshotPath = await captureScreenshot(url, vp.name, { width: vp.width, height: vp.height });
+        screenshotPath = await captureScreenshot(browser, url, vp.name, { width: vp.width, height: vp.height });
       } catch (err) {
         console.error(`⚠️  Screenshot failed for ${vp.label}: ${err instanceof Error ? err.message : err}`);
         console.error('   Skipping this viewport and continuing...\n');
@@ -138,6 +138,9 @@ async function compareViewports(url: string) {
       });
 
       await sleep(2000);
+    }
+    } finally {
+      await browser.close();
     }
 
     if (results.length === 0) {

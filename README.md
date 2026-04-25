@@ -19,7 +19,7 @@ Built against the cal.com open-source scheduling platform as a real-world target
           │                          │                          │
    ┌──────▼──────┐          ┌────────▼────────┐         ┌───────▼───────┐
    │  AI Tools   │          │  Playwright E2E │         │  Autonomous   │
-   │  (8 tools)  │          │  Test Suite     │         │  Agent        │
+   │  (9 tools)  │          │  Test Suite     │         │  Agent        │
    └──────┬──────┘          └────────┬────────┘         └───────┬───────┘
           │                          │                          │
    ┌──────▼──────────────────────────▼──────────────────────────▼───────┐
@@ -40,24 +40,29 @@ qa-playwright/
     coverage-advisor.ts     # Score coverage and generate missing tests
     browser-agent.ts        # Autonomous agent that navigates and tests independently
     persona-engine.ts       # Synthetic persona engine for edge case testing
-    visual-regression.ts      # AI vision analysis across desktop, tablet, and mobile
-    data-consistency.ts       # Verify data integrity across marketplace pages
-    cdp-inspector.ts          # Browser protocol debugging via CDP session
+    visual-regression.ts    # AI vision analysis across desktop, tablet, and mobile
+    data-consistency.ts     # Verify data integrity across marketplace pages
+    cdp-inspector.ts        # Browser protocol debugging via CDP session
+    locator-healer.ts       # AI-powered broken locator healing
+    groq-client.ts          # Shared Groq client (LLM + vision) with retry backoff
+    tool-utils.ts           # Shared utilities: sleep, saveReport, parseAIJson, constants
   docs/
     cal-com-qa-audit.md     # Full QA audit of cal.com codebase
   tests/
     pages/
       BookingPage.ts        # Page Object Model for cal.com booking page
-    booking-flow.spec.ts    # Main E2E test suite (cross-browser, self-healing)
+    booking-flow.spec.ts    # Main E2E test suite (cross-browser)
     ai-generated.spec.ts    # Output of generate-tests tool
   visual-regression/        # Screenshots from visual regression runs
   persona-screenshots/      # Screenshots from persona engine runs
   agent-screenshots/        # Screenshots from autonomous agent runs
   # Generated reports (*-report.md) are gitignored — created by each tool run
+  .env.example                 # Environment variable template
+  .github/workflows/playwright.yml  # CI — runs tests on every push/PR
+  eslint.config.mjs            # ESLint flat config with TypeScript rules
   mcp-server.ts                # MCP server exposing all tools to LLM clients
   mcp-config.json              # MCP client configuration for Claude Code/Cursor
   mcp-playwright-demo.ts       # Official @playwright/mcp server demo — LLM-controlled browser
-  playwright-mcp-report.md     # Latest Playwright MCP session report
   cli.ts                       # Unified CLI — run all tools with: npx tsx cli.ts <command>
 ```
 
@@ -66,12 +71,12 @@ qa-playwright/
 ## E2E Test Suite
 
 Cross-browser tests covering the cal.com public booking flow across Chromium,
-Firefox, and WebKit — 12 tests, all passing.
+Firefox, and WebKit — 24 tests (8 per browser × 3 browsers), all passing.
 
 ### Features
 
 - **Page Object Model** — interactions encapsulated in `BookingPage.ts`
-- **Self-healing selectors** — fallback locator strategies prevent brittle tests
+- **Resilient locators** — `.or()` chaining prevents brittle tests across browser engines
 - **Cross-browser** — Chromium, Firefox, WebKit
 - **Mobile viewport** — responsive design validated at 375×812 (iPhone X)
 - **Trace Viewer** — traces captured on first retry and retained on failure
@@ -82,6 +87,11 @@ Firefox, and WebKit — 12 tests, all passing.
 # All browsers
 npx playwright test
 
+# Single browser
+npm run test:chromium
+npm run test:firefox
+npm run test:webkit
+
 # AI-generated tests only (Chromium)
 npm run test:ai-generated
 
@@ -90,9 +100,6 @@ npx playwright test tests/booking-flow.spec.ts
 
 # Headed mode (watch the browser)
 npx playwright test --headed
-
-# Single browser
-npx playwright test --project=chromium
 
 # Open trace viewer after run
 npx playwright show-report
@@ -324,7 +331,59 @@ Output: `cdp-report.md`
 
 ---
 
-## MCP Server
+### 9. AI Locator Healer
+
+Takes a broken selector or Playwright error log, snapshots the live DOM,
+asks the LLM for 5 ranked replacement strategies, verifies each live in a
+real browser, and reports the best working alternative.
+
+```bash
+# Demo with built-in broken selector
+npm run heal-locator
+
+# Heal a specific broken selector
+npm run heal-locator -- "getByTestId('old-id')"
+
+# Pass a full Playwright error log
+npm run heal-locator -- path/to/error.log https://myapp.com
+```
+
+**How it works:**
+
+1. Extracts the broken selector from the input (or parses it from an error log)
+2. Launches a Playwright browser, navigates to the target URL
+3. Captures a DOM context snapshot (IDs, roles, test IDs, headings, visible text)
+4. Sends the broken selector + DOM context to the LLM for 5 ranked suggestions
+5. Verifies each suggestion live — checks visibility and elementCount
+6. Returns the best verified replacement and its confidence score
+
+**Real demo output — healing `getByTestId('event-title')`:**
+
+```text
+┌─┬─────────────────────────────────────────────────┬────────┬──────────┐
+│ │ Locator                                         │ Conf.  │ Verified │
+├─┼─────────────────────────────────────────────────┼────────┼──────────┤
+│1│ page.getByRole('heading', { name: 'Chat' })     │ 95%    │ ✅       │
+│2│ page.locator('h1')                              │ 85%    │ ✅       │
+│3│ page.locator('[data-testid="event-title"]')     │ 75%    │ ✅       │
+│4│ page.getByText('Chat', { exact: true })         │ 65%    │ ❌       │
+│5│ page.locator('.event-title')                    │ 55%    │ ❌       │
+└─┴─────────────────────────────────────────────────┴────────┴──────────┘
+
+✅ Best replacement: page.getByRole('heading', { name: 'Chat' })
+```
+
+**Why this matters:**
+
+When a `data-testid` gets renamed or removed during a UI refactor, finding
+replacement selectors by hand means opening DevTools, inspecting the DOM, and
+trial-and-erroring. The healer automates this in seconds — it snapshots the
+live DOM, reasons about the element's semantic role, and verifies the candidate
+works before reporting it.
+
+Output: `locator-healer-report.md`
+
+---
 
 The toolkit exposes all tools as a standard MCP server, making them callable
 from any MCP-compatible client — Claude Code, Cursor, or any open-source
@@ -345,6 +404,7 @@ npx tsx mcp-server.ts
 | `generate_tests` | Generates a full test file for any URL |
 | `visual_regression` | AI vision analysis across desktop and mobile viewports |
 | `data_consistency` | Checks data consistency across marketplace pages |
+| `heal_locator` | Heals a broken locator and returns ranked verified replacements |
 
 ### Connect to Claude Code
 
@@ -423,6 +483,7 @@ npx tsx cli.ts <command> [options]
 | `personas` | Synthetic persona engine |
 | `consistency` | Data consistency checker |
 | `cdp <url>` | CDP browser protocol inspector |
+| `heal [selector] [url]` | Heal a broken locator with AI suggestions |
 | `mcp <url>` | Playwright MCP server demo |
 | `test` | Run the full Playwright test suite |
 | `report` | Open the Playwright trace viewer |
@@ -432,6 +493,7 @@ npx tsx cli.ts <command> [options]
 npx tsx cli.ts generate https://cal.com/bailey/chat
 npx tsx cli.ts visual https://cal.com/bailey/chat
 npx tsx cli.ts agent "verify booking flow" https://cal.com/bailey/chat
+npx tsx cli.ts heal "getByTestId('old-id')" https://cal.com/bailey/chat
 npx tsx cli.ts test
 ```
 
@@ -459,8 +521,9 @@ cp .env.example .env
 
 ```env
 GROQ_API_KEY=your_key_here       # Required — get it free from console.groq.com
-BASE_URL=https://cal.com         # Optional — target URL for tests and tools (default: https://cal.com)
+BASE_URL=https://cal.com         # Optional — target base URL (default: https://cal.com)
 HOST_NAME=Bailey Pumfleet        # Optional — expected host name in assertions
+BOOKING_PATH=/bailey/chat        # Optional — booking page path (default: /bailey/chat)
 ```
 
 ---
@@ -499,18 +562,24 @@ toolkit reads, maps, and tests any repository autonomously from day one.
 
 ## Key Engineering Decisions
 
-### Self-healing selector pattern
+### Resilient locator pattern
 
-When a primary selector breaks (e.g. a `data-testid` gets renamed), the test
-automatically falls back to alternative strategies:
+Locators chain multiple strategies with `.or()` so tests survive minor UI
+refactors without touching a single line of test code:
 
 ```typescript
-const locator = await selfHealingLocator(page, [
-  () => page.getByTestId('event-title'),        // primary
-  () => page.locator('h1').first(),             // fallback 1
-  () => page.getByText('Chat', { exact: true }) // fallback 2
-]);
+// BookingPage.ts — POM getter with primary + fallback strategies
+get firstAvailableDay() {
+  return this.page
+    .locator('td[data-testid*="day-"][aria-disabled="false"]')
+    .or(this.page.locator('button[data-testid*="day-"]:not([disabled])'))
+    .first();
+}
 ```
+
+For broken selectors that can't be fixed by inspection alone, the
+[AI Locator Healer](#9-ai-locator-healer) snapshots the live DOM and returns
+5 ranked verified replacements in seconds.
 
 ### Strict mode violation fix
 

@@ -64,3 +64,13 @@ export const DEFAULT_BASE_URL = process.env.BASE_URL || 'https://cal.com';
 
 /** Full default target URL (base + path). */
 export const DEFAULT_TARGET_URL = `${DEFAULT_BASE_URL}${DEFAULT_BOOKING_PATH}`;
+
+/**
+ * Returns true if a CSS selector string is safe to pass to page.locator().
+ * Rejects empty, oversized, or injection-pattern strings.
+ */
+export function isSafeSelector(selector: string | undefined): selector is string {
+  if (!selector || selector.trim().length === 0) return false;
+  if (selector.length > 500) return false;
+  return !/<script|javascript:|on\w+\s*=|<iframe/i.test(selector);
+}

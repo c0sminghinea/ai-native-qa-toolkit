@@ -1,5 +1,5 @@
 import { groqChat, MODELS } from './groq-client';
-import { handleToolError, saveReport, parseAIJson, sleep, DEFAULT_TARGET_URL } from './tool-utils';
+import { handleToolError, isSafeSelector, saveReport, parseAIJson, sleep, DEFAULT_TARGET_URL } from './tool-utils';
 import { chromium, type Page, type Locator } from '@playwright/test';
 import * as fs from 'fs';
 
@@ -89,8 +89,7 @@ function buildLocator(page: Page, suggestion: SelectorSuggestion): Locator | nul
 
       case 'locator': {
         const selector = first as string;
-        // Reject potential injection patterns before passing to Playwright
-        if (!selector || selector.length > 500 || /<script|javascript:|on\w+\s*=/i.test(selector)) {
+        if (!isSafeSelector(selector)) {
           console.log(`⚠️  Unsafe CSS selector rejected: ${selector}`);
           return null;
         }
