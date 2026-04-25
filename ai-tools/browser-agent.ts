@@ -148,144 +148,145 @@ async function runAgent(goal: string, startUrl: string, maxSteps = 8) {
 
   const browser = await chromium.launch({ headless: process.env.CI ? true : !process.env.PWDEBUG });
   const page = await browser.newPage();
-  await page.goto(startUrl);
+  try {
+    await page.goto(startUrl);
 
-  const history: string[] = [];
-  const screenshotsDir = path.join(process.cwd(), 'agent-screenshots');
-  ensureDir(screenshotsDir);
+    const history: string[] = [];
+    const screenshotsDir = path.join(process.cwd(), 'agent-screenshots');
+    ensureDir(screenshotsDir);
 
-  for (let step = 1; step <= maxSteps; step++) {
-    console.log(`\n--- Step ${step}/${maxSteps} ---`);
+    for (let step = 1; step <= maxSteps; step++) {
+      console.log(`\n--- Step ${step}/${maxSteps} ---`);
 
-    // Capture current page state
-    const currentUrl = page.url();
-    const pageContent = await page.evaluate(() => {
-      const interactive = Array.from(document.querySelectorAll('a, button, [role="button"]'))
-        .map(el => {
-          const text = (el as HTMLElement).innerText?.trim();
-          const href = (el as HTMLAnchorElement).href;
-          const testId = el.getAttribute('data-testid');
-          return `[${el.tagName}] text="${text}" ${href ? `href="${href}"` : ''} ${testId ? `data-testid="${testId}"` : ''}`;
-        })
-        .filter(s => s.includes('text="') && !s.includes('text=""') && !s.includes('disabled'))
-        .slice(0, 50)
-        .join('\n');
+      // Capture current page state
+      const currentUrl = page.url();
+      const pageContent = await page.evaluate(() => {
+        const interactive = Array.from(document.querySelectorAll('a, button, [role="button"]'))
+          .map(el => {
+            const text = (el as HTMLElement).innerText?.trim();
+            const href = (el as HTMLAnchorElement).href;
+            const testId = el.getAttribute('data-testid');
+            return `[${el.tagName}] text="${text}" ${href ? `href="${href}"` : ''} ${testId ? `data-testid="${testId}"` : ''}`;
+          })
+          .filter(s => s.includes('text="') && !s.includes('text=""') && !s.includes('disabled'))
+          .slice(0, 50)
+          .join('\n');
 
-      // Explicitly surface time slot buttons so the AI recognises completion
-      const timeSlots = Array.from(document.querySelectorAll('[data-testid="time"]'))
-        .map(el => (el as HTMLElement).innerText?.trim())
-        .filter(Boolean)
-        .slice(0, 10);
+        // Explicitly surface time slot buttons so the AI recognises completion
+        const timeSlots = Array.from(document.querySelectorAll('[data-testid="time"]'))
+          .map(el => (el as HTMLElement).innerText?.trim())
+          .filter(Boolean)
+          .slice(0, 10);
 
-      const timeSlotsSection =
-        timeSlots.length > 0 ? `\n\nTIME SLOTS VISIBLE: ${timeSlots.join(', ')}` : '';
+        const timeSlotsSection =
+          timeSlots.length > 0 ? `\n\nTIME SLOTS VISIBLE: ${timeSlots.join(', ')}` : '';
 
-      return `INTERACTIVE ELEMENTS:\n${interactive}\n\nPAGE TEXT:\n${document.body.innerText.substring(0, 1000)}${timeSlotsSection}`;
-    });
-    const screenshotPath = path.join(screenshotsDir, `step-${step}.png`);
-    await page.screenshot({ path: screenshotPath });
+        return `INTERACTIVE ELEMENTS:\n${interactive}\n\nPAGE TEXT:\n${document.body.innerText.substring(0, 1000)}${timeSlotsSection}`;
+      });
+      const screenshotPath = path.join(screenshotsDir, `step-${step}.png`);
+      await page.screenshot({ path: screenshotPath });
 
-    console.log(`📍 URL: ${currentUrl}`);
+      console.log(`📍 URL: ${currentUrl}`);
 
-    // Ask AI what to do next
-    let action: AgentAction;
-    try {
-      action = await decideNextAction(goal, pageContent, currentUrl, history);
-    } catch (err) {
-      console.error('❌ AI decision failed:', err);
-      break;
-    }
-
-    console.log(`🧠 AI Decision: ${action.action} — ${action.reason}`);
-    history.push(`Step ${step}: ${action.action} — ${action.reason}`);
-
-    // Execute the action
-    try {
-      switch (action.action) {
-        case 'navigate': {
-          if (!action.url) {
-            console.log('⚠️  navigate action missing url, skipping');
-            break;
-          }
-          // Resolve relative URLs (e.g. /bailey/chat) against startUrl
-          const resolvedNavUrl = (() => {
-            try {
-              return new URL(action.url!);
-            } catch {
-              try {
-                return new URL(action.url!, startUrl);
-              } catch {
-                return null;
-              }
-            }
-          })();
-          if (!resolvedNavUrl) {
-            console.log(`⚠️  Invalid navigate URL: ${action.url}, skipping`);
-            break;
-          }
-          const allowedHost = new URL(startUrl).hostname;
-          if (resolvedNavUrl.hostname !== allowedHost) {
-            console.log(
-              `⚠️  SSRF: navigate to ${resolvedNavUrl.hostname} blocked (only ${allowedHost} allowed)`
-            );
-            break;
-          }
-          await page.goto(resolvedNavUrl.toString());
-          break;
-        }
-
-        case 'click': {
-          // Extract clean text from AI selector like BUTTON[text='14 Today'] or BUTTON[text='25']
-          const textMatch =
-            action.selector!.match(/text=['"](.*?)['"]/) ||
-            action.selector!.match(/BUTTON\[text=['"]?(.*?)['"]?\]/);
-          const cleanText = textMatch ? textMatch[1] : action.selector!;
-          await tryClick(page, action.selector!, cleanText, new URL(startUrl).hostname);
-          await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-          break;
-        }
-
-        case 'fill':
-          if (isSafeSelector(action.selector)) {
-            await page.locator(action.selector).first().fill(action.value!);
-          } else {
-            console.log(`⚠️  Unsafe selector rejected for fill: ${action.selector}`);
-          }
-          break;
-
-        case 'scroll':
-          await page.evaluate(() => window.scrollBy(0, 400));
-          break;
-
-        case 'done':
-          console.log(`\n✅ Goal achieved!`);
-          console.log(`📝 Finding: ${action.finding}`);
-          await generateReport(goal, history, action.finding!, screenshotsDir, true);
-          await browser.close();
-          return;
-
-        case 'fail':
-          console.log(`\n❌ Goal could not be completed`);
-          console.log(`📝 Finding: ${action.finding}`);
-          await generateReport(goal, history, action.finding!, screenshotsDir, false);
-          await browser.close();
-          return;
+      // Ask AI what to do next
+      let action: AgentAction;
+      try {
+        action = await decideNextAction(goal, pageContent, currentUrl, history);
+      } catch (err) {
+        console.error('❌ AI decision failed:', err);
+        break;
       }
-    } catch (err) {
-      console.log(`⚠️  Action failed: ${err}`);
-      history.push(`Step ${step}: Action failed — ${err}`);
-    }
-  }
 
-  console.log('\n⏱️  Max steps reached');
-  await generateReport(
-    goal,
-    history,
-    'Max steps reached without completing goal',
-    screenshotsDir,
-    false
-  );
-  await browser.close();
+      console.log(`🧠 AI Decision: ${action.action} — ${action.reason}`);
+      history.push(`Step ${step}: ${action.action} — ${action.reason}`);
+
+      // Execute the action
+      try {
+        switch (action.action) {
+          case 'navigate': {
+            if (!action.url) {
+              console.log('⚠️  navigate action missing url, skipping');
+              break;
+            }
+            // Resolve relative URLs (e.g. /bailey/chat) against startUrl
+            const resolvedNavUrl = (() => {
+              try {
+                return new URL(action.url!);
+              } catch {
+                try {
+                  return new URL(action.url!, startUrl);
+                } catch {
+                  return null;
+                }
+              }
+            })();
+            if (!resolvedNavUrl) {
+              console.log(`⚠️  Invalid navigate URL: ${action.url}, skipping`);
+              break;
+            }
+            const allowedHost = new URL(startUrl).hostname;
+            if (resolvedNavUrl.hostname !== allowedHost) {
+              console.log(
+                `⚠️  SSRF: navigate to ${resolvedNavUrl.hostname} blocked (only ${allowedHost} allowed)`
+              );
+              break;
+            }
+            await page.goto(resolvedNavUrl.toString());
+            break;
+          }
+
+          case 'click': {
+            // Extract clean text from AI selector like BUTTON[text='14 Today'] or BUTTON[text='25']
+            const textMatch =
+              action.selector!.match(/text=['"](.*?)['"]/) ||
+              action.selector!.match(/BUTTON\[text=['"]?(.*?)['"]?\]/);
+            const cleanText = textMatch ? textMatch[1] : action.selector!;
+            await tryClick(page, action.selector!, cleanText, new URL(startUrl).hostname);
+            await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+            break;
+          }
+
+          case 'fill':
+            if (isSafeSelector(action.selector)) {
+              await page.locator(action.selector).first().fill(action.value!);
+            } else {
+              console.log(`⚠️  Unsafe selector rejected for fill: ${action.selector}`);
+            }
+            break;
+
+          case 'scroll':
+            await page.evaluate(() => window.scrollBy(0, 400));
+            break;
+
+          case 'done':
+            console.log(`\n✅ Goal achieved!`);
+            console.log(`📝 Finding: ${action.finding}`);
+            await generateReport(goal, history, action.finding!, screenshotsDir, true);
+            return;
+
+          case 'fail':
+            console.log(`\n❌ Goal could not be completed`);
+            console.log(`📝 Finding: ${action.finding}`);
+            await generateReport(goal, history, action.finding!, screenshotsDir, false);
+            return;
+        }
+      } catch (err) {
+        console.log(`⚠️  Action failed: ${err}`);
+        history.push(`Step ${step}: Action failed — ${err}`);
+      }
+    }
+
+    console.log('\n⏱️  Max steps reached');
+    await generateReport(
+      goal,
+      history,
+      'Max steps reached without completing goal',
+      screenshotsDir,
+      false
+    );
+  } finally {
+    await browser.close();
+  }
 }
 
 async function generateReport(

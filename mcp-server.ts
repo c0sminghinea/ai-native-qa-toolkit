@@ -275,6 +275,7 @@ server.tool(
           content: [{ type: 'text', text: 'Error: path outside workspace is not permitted' }],
         };
       }
+      ensureDir(path.dirname(resolvedPath));
       fs.writeFileSync(resolvedPath, code);
       return {
         content: [

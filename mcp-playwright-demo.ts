@@ -1,5 +1,5 @@
 import { groqChat, MODELS } from './ai-tools/groq-client';
-import { sleep } from './ai-tools/tool-utils';
+import { sleep, DEFAULT_TARGET_URL } from './ai-tools/tool-utils';
 import * as fs from 'fs';
 import * as path from 'path';
 import { spawn } from 'child_process';
@@ -108,15 +108,15 @@ async function runPlaywrightMCPDemo() {
     });
     console.log();
 
-    // Navigate to cal.com using the MCP tool
-    console.log('🌐 Using MCP to navigate to cal.com/bailey/chat...');
+    // Navigate to the configured target URL using the MCP tool
+    console.log(`🌐 Using MCP to navigate to ${DEFAULT_TARGET_URL}...`);
     await sendMCPMessage(mcpServer, {
       jsonrpc: '2.0',
       id: 3,
       method: 'tools/call',
       params: {
         name: 'browser_navigate',
-        arguments: { url: 'https://cal.com/bailey/chat' },
+        arguments: { url: DEFAULT_TARGET_URL },
       },
     });
     console.log('   ✅ Navigation complete\n');
@@ -148,7 +148,7 @@ async function runPlaywrightMCPDemo() {
         },
         {
           role: 'user',
-          content: `You have navigated to cal.com/bailey/chat via Playwright MCP.
+          content: `You have navigated to ${DEFAULT_TARGET_URL} via Playwright MCP.
           
 Page snapshot (accessibility tree):
 ${snapshot.substring(0, 2000)}
@@ -185,7 +185,7 @@ ${tools.map((t: McpTool) => `- \`${t.name}\`: ${t.description ?? ''}`).join('\n'
 1. Started \`@playwright/mcp\` server
 2. Initialized MCP connection (JSON-RPC 2.0)
 3. Listed ${tools.length} available browser control tools
-4. Navigated to cal.com/bailey/chat via \`browser_navigate\` MCP tool
+4. Navigated to ${DEFAULT_TARGET_URL} via \`browser_navigate\` MCP tool
 5. Captured accessibility snapshot via \`browser_snapshot\` MCP tool
 6. AI analyzed snapshot and proposed next QA action
 
