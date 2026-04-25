@@ -12,6 +12,9 @@ const server = new McpServer({
   version: '1.0.0',
 });
 
+// Tracks open browsers so SIGTERM/SIGINT can close them gracefully
+const activeBrowsers = new Set<import('@playwright/test').Browser>();
+
 // ─── Tool 1: Failure Analyzer ─────────────────────────────────────────────
 server.tool(
   'analyze_failure',
@@ -558,8 +561,6 @@ server.tool(
 );
 
 // ─── Start Server ─────────────────────────────────────────────────────────
-const activeBrowsers = new Set<import('@playwright/test').Browser>();
-
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);

@@ -28,7 +28,6 @@
     "test:firefox": "playwright test --project=firefox",
     "test:webkit": "playwright test --project=webkit",
     "clean": "rm -rf dist",
-    "prepare": "husky",
     "prepare": "husky"
   },
   "keywords": [

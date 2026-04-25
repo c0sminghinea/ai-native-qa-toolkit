@@ -9,6 +9,11 @@ on:
     # Nightly at 06:00 UTC — catches regressions from upstream site changes
     - cron: '0 6 * * *'
 
+# Cancel any in-progress run for the same branch/PR when a new push arrives
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest

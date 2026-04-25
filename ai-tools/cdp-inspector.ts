@@ -3,12 +3,14 @@ import { saveReport, DEFAULT_TARGET_URL } from './tool-utils';
 import { chromium } from '@playwright/test';
 
 interface NetworkRequest {
+  requestId: string;
   url: string;
   method: string;
   resourceType: string;
   status?: number;
   responseSize?: number;
   timing?: number;
+  startTime?: number;
 }
 
 interface ConsoleMessage {
@@ -79,17 +81,27 @@ async function inspectWithCDP(url: string) {
   // Capture all network requests via CDP
   cdpSession.on('Network.requestWillBeSent', params => {
     networkRequests.push({
+      requestId: params.requestId,
       url: params.request.url,
       method: params.request.method,
       resourceType: params.type || 'unknown',
+      startTime: params.timestamp,
     });
   });
 
   // Capture network responses via CDP
   cdpSession.on('Network.responseReceived', params => {
-    const request = networkRequests.find(r => r.url === params.response.url);
+    const request = networkRequests.find(r => r.requestId === params.requestId);
     if (request) {
       request.status = params.response.status;
+    }
+  });
+
+  // Record actual load time (in milliseconds) from send to finish
+  cdpSession.on('Network.loadingFinished', params => {
+    const request = networkRequests.find(r => r.requestId === params.requestId);
+    if (request?.startTime !== undefined) {
+      request.timing = Math.round((params.timestamp - request.startTime) * 1000);
     }
   });
 

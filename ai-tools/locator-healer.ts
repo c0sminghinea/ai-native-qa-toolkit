@@ -320,22 +320,24 @@ Rules:
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
-const rawInput = process.argv[2] || "getByTestId('event-title')";
-const url = process.argv[3] || DEFAULT_TARGET_URL;
+if (require.main === module) {
+  const rawInput = process.argv[2] || "getByTestId('event-title')";
+  const url = process.argv[3] || DEFAULT_TARGET_URL;
 
-let brokenSelector: string;
-try {
-  brokenSelector = extractBrokenSelector(rawInput);
-} catch (err) {
-  handleToolError(err, {
-    'no such file': 'Pass a valid error log path or a selector string as the first argument',
-  });
+  let brokenSelector: string;
+  try {
+    brokenSelector = extractBrokenSelector(rawInput);
+  } catch (err) {
+    handleToolError(err, {
+      'no such file': 'Pass a valid error log path or a selector string as the first argument',
+    });
+  }
+
+  healLocator(brokenSelector!, url).catch(err =>
+    handleToolError(err, {
+      'API key': 'Add GROQ_API_KEY=your_key to your .env file',
+      URL: 'Usage: npx tsx ai-tools/locator-healer.ts "brokenSelector" https://example.com',
+      load: 'Check the URL is publicly accessible',
+    })
+  );
 }
-
-healLocator(brokenSelector!, url).catch(err =>
-  handleToolError(err, {
-    'API key': 'Add GROQ_API_KEY=your_key to your .env file',
-    URL: 'Usage: npx tsx ai-tools/locator-healer.ts "brokenSelector" https://example.com',
-    load: 'Check the URL is publicly accessible',
-  })
-);

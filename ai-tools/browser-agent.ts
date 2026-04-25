@@ -76,12 +76,25 @@ Decide the next action. Respond with ONLY a JSON object in this exact format:
 async function tryClick(
   page: import('@playwright/test').Page,
   selector: string,
-  cleanText: string
+  cleanText: string,
+  allowedHost: string
 ): Promise<void> {
   const testIdMatch = selector.match(/data-testid=['"](.*?)['"]/);
   const hrefMatch = selector.match(/href=['"](.*?)['"]/);
 
   if (hrefMatch) {
+    try {
+      const hrefUrl = new URL(hrefMatch[1], page.url());
+      if (hrefUrl.hostname !== allowedHost) {
+        console.log(
+          `⚠️  SSRF: href navigation to ${hrefUrl.hostname} blocked (only ${allowedHost} allowed)`
+        );
+        return;
+      }
+    } catch {
+      console.log(`⚠️  Invalid href value: ${hrefMatch[1]}, skipping`);
+      return;
+    }
     await page.goto(hrefMatch[1]);
     return;
   }
@@ -227,7 +240,7 @@ async function runAgent(goal: string, startUrl: string, maxSteps = 8) {
             action.selector!.match(/text=['"](.*?)['"]/) ||
             action.selector!.match(/BUTTON\[text=['"]?(.*?)['"]?\]/);
           const cleanText = textMatch ? textMatch[1] : action.selector!;
-          await tryClick(page, action.selector!, cleanText);
+          await tryClick(page, action.selector!, cleanText, new URL(startUrl).hostname);
           await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
           break;
         }
