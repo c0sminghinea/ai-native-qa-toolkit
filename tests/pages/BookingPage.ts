@@ -39,7 +39,10 @@ export class BookingPage {
   }
 
   get nameField(): Locator {
-    return this.page.getByLabel(/name/i).or(this.page.getByPlaceholder(/your name/i)).first();
+    return this.page
+      .getByLabel(/name/i)
+      .or(this.page.getByPlaceholder(/your name/i))
+      .first();
   }
 
   get confirmButton(): Locator {

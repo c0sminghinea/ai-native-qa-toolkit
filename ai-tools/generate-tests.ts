@@ -10,10 +10,12 @@ function collectExistingPom(): string {
   if (!fs.existsSync(pagesDir)) return '';
   const files = fs.readdirSync(pagesDir).filter(f => f.endsWith('.ts'));
   if (files.length === 0) return '';
-  return files.map(f => {
-    const content = fs.readFileSync(path.join(pagesDir, f), 'utf-8');
-    return `// --- ${f} ---\n${content}`;
-  }).join('\n\n');
+  return files
+    .map(f => {
+      const content = fs.readFileSync(path.join(pagesDir, f), 'utf-8');
+      return `// --- ${f} ---\n${content}`;
+    })
+    .join('\n\n');
 }
 
 export async function explorePage(url: string) {
@@ -34,23 +36,21 @@ export async function explorePage(url: string) {
         .map(el => ({
           testId: el.getAttribute('data-testid'),
           tag: el.tagName,
-          text: ((el as HTMLElement).innerText || '').trim().substring(0, 50)
+          text: ((el as HTMLElement).innerText || '').trim().substring(0, 50),
         }));
 
       const buttons = Array.from(document.querySelectorAll('button:not([disabled])'))
         .filter(visible)
         .map(el => ({
           text: ((el as HTMLElement).innerText || '').trim().substring(0, 50),
-          testId: el.getAttribute('data-testid')
+          testId: el.getAttribute('data-testid'),
         }))
         .filter(b => b.text);
 
-      const headings = Array.from(document.querySelectorAll('h1,h2,h3')).map(
-        el => ({
-          tag: el.tagName,
-          text: ((el as HTMLElement).innerText || '').trim().substring(0, 50)
-        })
-      );
+      const headings = Array.from(document.querySelectorAll('h1,h2,h3')).map(el => ({
+        tag: el.tagName,
+        text: ((el as HTMLElement).innerText || '').trim().substring(0, 50),
+      }));
 
       const formElements = [
         ...Array.from(document.querySelectorAll('label'))
@@ -80,7 +80,6 @@ export async function explorePage(url: string) {
     const title = await page.title();
     const finalUrl = page.url();
     return { url: finalUrl, title, ...data };
-
   } finally {
     await browser.close();
   }
@@ -107,7 +106,9 @@ async function generateTests(url: string, outputPath?: string) {
     );
 
     if (p.testIds.length === 0 && p.buttons.length === 0) {
-      throw new Error('No interactive elements found on page — the page may not have loaded correctly');
+      throw new Error(
+        'No interactive elements found on page — the page may not have loaded correctly'
+      );
     }
 
     const parsedUrl = new URL(p.url);
@@ -122,36 +123,37 @@ async function generateTests(url: string, outputPath?: string) {
       console.log('📄 Existing POM context injected\n');
     }
 
-    const formLines = p.formElements.length > 0
-      ? [
-          '',
-          'FORM ELEMENTS:',
-          ...p.formElements.map(f => {
-            if ('text' in f && f.type === 'label') {
-              return `- [label] "${f.text}"${f.forAttr ? ` for="${f.forAttr}"` : ''}`;
-            }
-            const fi = f as { type: string; inputType: string | null; placeholder: string | null; ariaLabel: string | null; testId: string | null };
-            return `- [${fi.type}]${fi.inputType ? ` type="${fi.inputType}"` : ''}${fi.placeholder ? ` placeholder="${fi.placeholder}"` : ''}${fi.ariaLabel ? ` aria-label="${fi.ariaLabel}"` : ''}${fi.testId ? ` data-testid="${fi.testId}"` : ''}`;
-          }),
-        ]
-      : [];
+    const formLines =
+      p.formElements.length > 0
+        ? [
+            '',
+            'FORM ELEMENTS:',
+            ...p.formElements.map(f => {
+              if ('text' in f && f.type === 'label') {
+                return `- [label] "${f.text}"${f.forAttr ? ` for="${f.forAttr}"` : ''}`;
+              }
+              const fi = f as {
+                type: string;
+                inputType: string | null;
+                placeholder: string | null;
+                ariaLabel: string | null;
+                testId: string | null;
+              };
+              return `- [${fi.type}]${fi.inputType ? ` type="${fi.inputType}"` : ''}${fi.placeholder ? ` placeholder="${fi.placeholder}"` : ''}${fi.ariaLabel ? ` aria-label="${fi.ariaLabel}"` : ''}${fi.testId ? ` data-testid="${fi.testId}"` : ''}`;
+            }),
+          ]
+        : [];
 
     const lines = [
       'Generate a Playwright TypeScript test file for: ' + p.url,
       'Title: ' + p.title,
       pomSection,
       'DATA-TESTID ELEMENTS:',
-      ...p.testIds.map(
-        e => '- data-testid="' + e.testId + '" ' + e.tag + ' "' + e.text + '"'
-      ),
+      ...p.testIds.map(e => '- data-testid="' + e.testId + '" ' + e.tag + ' "' + e.text + '"'),
       '',
       'BUTTONS:',
       ...p.buttons.map(
-        b =>
-          '- "' +
-          b.text +
-          '"' +
-          (b.testId ? ' [data-testid="' + b.testId + '"]' : '')
+        b => '- "' + b.text + '"' + (b.testId ? ' [data-testid="' + b.testId + '"]' : '')
       ),
       '',
       'HEADINGS:',
@@ -169,7 +171,7 @@ async function generateTests(url: string, outputPath?: string) {
       '- Use relative paths (e.g. "' + relativePath + '"), not absolute https:// URLs',
       '- 5+ tests: load, elements, click date, time slots, mobile',
       '- Page Object Model pattern',
-      '- Return ONLY TypeScript code, no markdown fences, no explanations'
+      '- Return ONLY TypeScript code, no markdown fences, no explanations',
     ];
 
     console.log('🤖 Generating tests from real page data...\n');
@@ -179,11 +181,11 @@ async function generateTests(url: string, outputPath?: string) {
       messages: [
         {
           role: 'system',
-          content: 'Expert QA engineer. Return ONLY TypeScript, no markdown.'
+          content: 'Expert QA engineer. Return ONLY TypeScript, no markdown.',
         },
-        { role: 'user', content: lines.join('\n') }
+        { role: 'user', content: lines.join('\n') },
       ],
-      max_tokens: 3000
+      max_tokens: 3000,
     });
 
     let code = result.choices[0].message.content!.trim();
@@ -207,12 +209,11 @@ async function generateTests(url: string, outputPath?: string) {
     console.log('--- Preview (first 400 chars) ---');
     console.log(code.substring(0, 400));
     console.log('...\n');
-
   } catch (err) {
     handleToolError(err, {
       'API key': 'Add GROQ_API_KEY=your_key to your .env file',
-      'URL': 'Usage: npx tsx ai-tools/generate-tests.ts https://example.com [output-path]',
-      'load': 'Check the URL is publicly accessible',
+      URL: 'Usage: npx tsx ai-tools/generate-tests.ts https://example.com [output-path]',
+      load: 'Check the URL is publicly accessible',
     });
   }
 }

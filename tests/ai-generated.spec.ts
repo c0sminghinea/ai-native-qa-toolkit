@@ -62,7 +62,10 @@ test.describe('Chat Page', () => {
   test('should open booking form after selecting a time slot', async () => {
     await bookingPage.selectFirstAvailableDate();
     const slotSelected = await bookingPage.selectFirstAvailableTimeSlot();
-    if (!slotSelected) { test.skip(true, 'No time slots available — skipping form check'); return; }
+    if (!slotSelected) {
+      test.skip(true, 'No time slots available — skipping form check');
+      return;
+    }
     await expect(bookingPage.nameField).toBeVisible({ timeout: 5000 });
   });
 });

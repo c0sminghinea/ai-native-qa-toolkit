@@ -49,17 +49,25 @@ test.describe('Cal.com Booking Flow', () => {
   test('booking form appears after selecting a time slot', async () => {
     await bookingPage.selectFirstAvailableDate();
     const slotSelected = await bookingPage.selectFirstAvailableTimeSlot();
-    if (!slotSelected) { test.skip(true, 'No time slots available — skipping form check'); return; }
+    if (!slotSelected) {
+      test.skip(true, 'No time slots available — skipping form check');
+      return;
+    }
     await expect(bookingPage.nameField).toBeVisible({ timeout: 5000 });
   });
 
   test('booking form validates required fields on empty submit', async () => {
     await bookingPage.selectFirstAvailableDate();
     const slotSelected = await bookingPage.selectFirstAvailableTimeSlot();
-    if (!slotSelected) { test.skip(true, 'No time slots available — skipping validation check'); return; }
+    if (!slotSelected) {
+      test.skip(true, 'No time slots available — skipping validation check');
+      return;
+    }
     const formAppeared = await bookingPage.submitEmptyBookingForm();
-    if (!formAppeared) { test.skip(true, 'Booking form did not load — skipping validation check'); return; }
+    if (!formAppeared) {
+      test.skip(true, 'Booking form did not load — skipping validation check');
+      return;
+    }
     await expect(bookingPage.validationError).toBeVisible({ timeout: 3000 });
   });
-
 });

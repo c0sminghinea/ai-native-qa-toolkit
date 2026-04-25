@@ -69,10 +69,10 @@ async function runPlaywrightMCPDemo() {
   // Start the official @playwright/mcp server
   console.log('🚀 Starting @playwright/mcp server...');
   const mcpServer = spawn('npx', ['playwright-mcp', '--headless'], {
-    stdio: ['pipe', 'pipe', 'pipe']
+    stdio: ['pipe', 'pipe', 'pipe'],
   });
 
-  mcpServer.stderr?.on('data', (data) => {
+  mcpServer.stderr?.on('data', data => {
     const msg = data.toString().trim();
     if (msg) console.log(`   [MCP Server] ${msg}`);
   });
@@ -89,8 +89,8 @@ async function runPlaywrightMCPDemo() {
       params: {
         protocolVersion: '2024-11-05',
         capabilities: {},
-        clientInfo: { name: 'qa-toolkit', version: '1.0.0' }
-      }
+        clientInfo: { name: 'qa-toolkit', version: '1.0.0' },
+      },
     });
 
     // List available tools
@@ -98,7 +98,7 @@ async function runPlaywrightMCPDemo() {
       jsonrpc: '2.0',
       id: 2,
       method: 'tools/list',
-      params: {}
+      params: {},
     });
 
     const tools = (toolsResponse.result as McpToolsResult)?.tools ?? [];
@@ -116,8 +116,8 @@ async function runPlaywrightMCPDemo() {
       method: 'tools/call',
       params: {
         name: 'browser_navigate',
-        arguments: { url: 'https://cal.com/bailey/chat' }
-      }
+        arguments: { url: 'https://cal.com/bailey/chat' },
+      },
     });
     console.log('   ✅ Navigation complete\n');
 
@@ -129,8 +129,8 @@ async function runPlaywrightMCPDemo() {
       method: 'tools/call',
       params: {
         name: 'browser_snapshot',
-        arguments: {}
-      }
+        arguments: {},
+      },
     });
 
     const snapshot = (snapshotResponse.result as McpContentResult)?.content?.[0]?.text ?? '';
@@ -143,7 +143,8 @@ async function runPlaywrightMCPDemo() {
       messages: [
         {
           role: 'system',
-          content: 'You are a QA engineer controlling a browser via MCP tools. Analyze the page snapshot and decide the best next action to verify the booking flow works correctly. Be concise.'
+          content:
+            'You are a QA engineer controlling a browser via MCP tools. Analyze the page snapshot and decide the best next action to verify the booking flow works correctly. Be concise.',
         },
         {
           role: 'user',
@@ -158,9 +159,9 @@ What is the most important thing to verify on this booking page, and which MCP t
 Respond in this format:
 OBSERVATION: what you see
 RISK: what could go wrong
-NEXT ACTION: which tool and why`
-        }
-      ]
+NEXT ACTION: which tool and why`,
+        },
+      ],
     });
 
     const decision = aiDecision.choices[0].message.content!;
@@ -198,7 +199,6 @@ ${decision}
     const reportPath = path.join(process.cwd(), 'playwright-mcp-report.md');
     fs.writeFileSync(reportPath, report);
     console.log('\n📄 Report saved to: playwright-mcp-report.md');
-
   } catch (err) {
     console.error('Error during MCP session:', err);
   } finally {

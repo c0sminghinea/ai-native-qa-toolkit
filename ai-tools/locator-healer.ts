@@ -1,5 +1,11 @@
 import { groqChat, MODELS } from './groq-client';
-import { handleToolError, isSafeSelector, saveReport, parseAIJson, DEFAULT_TARGET_URL } from './tool-utils';
+import {
+  handleToolError,
+  isSafeSelector,
+  saveReport,
+  parseAIJson,
+  DEFAULT_TARGET_URL,
+} from './tool-utils';
 import { chromium, type Page, type Locator } from '@playwright/test';
 import * as fs from 'fs';
 
@@ -45,7 +51,9 @@ function extractBrokenSelector(input: string): string {
     const locatorLine = content.match(/Locator:\s*(.+)/);
     if (locatorLine) return locatorLine[1].trim();
     // Fallback: first line containing a known locator method
-    const methodLine = content.match(/(getByTestId|getByRole|getByText|getByLabel|locator)\([^)]+\)/);
+    const methodLine = content.match(
+      /(getByTestId|getByRole|getByText|getByLabel|locator)\([^)]+\)/
+    );
     if (methodLine) return methodLine[0].trim();
     return content.substring(0, 300);
   }
@@ -70,16 +78,10 @@ function buildLocator(page: Page, suggestion: SelectorSuggestion): Locator | nul
         );
 
       case 'getByText':
-        return page.getByText(
-          first as string,
-          second as Parameters<Page['getByText']>[1]
-        );
+        return page.getByText(first as string, second as Parameters<Page['getByText']>[1]);
 
       case 'getByLabel':
-        return page.getByLabel(
-          first as string,
-          second as Parameters<Page['getByLabel']>[1]
-        );
+        return page.getByLabel(first as string, second as Parameters<Page['getByLabel']>[1]);
 
       case 'getByPlaceholder':
         return page.getByPlaceholder(
@@ -109,11 +111,16 @@ async function extractDomContext(page: Page): Promise<string> {
   return page.evaluate(() => {
     const testIds = Array.from(document.querySelectorAll('[data-testid]'))
       .filter(el => (el as HTMLElement).offsetParent !== null)
-      .map(el => `  testid="${el.getAttribute('data-testid')}" <${el.tagName.toLowerCase()}> "${((el as HTMLElement).innerText || '').trim().substring(0, 60)}"`)
+      .map(
+        el =>
+          `  testid="${el.getAttribute('data-testid')}" <${el.tagName.toLowerCase()}> "${((el as HTMLElement).innerText || '').trim().substring(0, 60)}"`
+      )
       .slice(0, 25);
 
-    const headings = Array.from(document.querySelectorAll('h1,h2,h3'))
-      .map(el => `  <${el.tagName.toLowerCase()}> "${((el as HTMLElement).innerText || '').trim().substring(0, 60)}"`);
+    const headings = Array.from(document.querySelectorAll('h1,h2,h3')).map(
+      el =>
+        `  <${el.tagName.toLowerCase()}> "${((el as HTMLElement).innerText || '').trim().substring(0, 60)}"`
+    );
 
     const buttons = Array.from(document.querySelectorAll('button:not([disabled])'))
       .filter(el => (el as HTMLElement).offsetParent !== null)
@@ -229,9 +236,13 @@ Rules:
     for (const suggestion of output.suggestions) {
       const locator = buildLocator(page, suggestion);
       const count = locator ? await locator.count().catch(() => 0) : 0;
-      const visible = count > 0
-        ? await locator!.first().isVisible({ timeout: 2000 }).catch(() => false)
-        : false;
+      const visible =
+        count > 0
+          ? await locator!
+              .first()
+              .isVisible({ timeout: 2000 })
+              .catch(() => false)
+          : false;
 
       verifiedResults.push({ suggestion, count, visible });
 
@@ -255,7 +266,9 @@ Rules:
     if (best) {
       console.log(`\n💡 Best replacement:\n   ${best.suggestion.playwrightCode}`);
     } else {
-      console.log('\n⚠️  No verified replacement found — the element may not be present on this page state.');
+      console.log(
+        '\n⚠️  No verified replacement found — the element may not be present on this page state.'
+      );
     }
 
     const report = [
@@ -275,7 +288,11 @@ Rules:
       '| Status | Confidence | Playwright Code | Verified Visible |',
       '|---|---|---|---|',
       ...verifiedResults.map(r => {
-        const status = r.visible ? '✅ Visible' : r.count > 0 ? '⚠️ Found (hidden)' : '❌ Not found';
+        const status = r.visible
+          ? '✅ Visible'
+          : r.count > 0
+            ? '⚠️ Found (hidden)'
+            : '❌ Not found';
         return `| ${status} | ${r.suggestion.confidence} | \`${r.suggestion.playwrightCode}\` | ${r.visible ? 'Yes' : 'No'} |`;
       }),
       '',
@@ -296,7 +313,6 @@ Rules:
     ].join('\n');
 
     saveReport('locator-healer-report.md', report);
-
   } finally {
     await browser.close();
   }
@@ -311,13 +327,15 @@ let brokenSelector: string;
 try {
   brokenSelector = extractBrokenSelector(rawInput);
 } catch (err) {
-  handleToolError(err, { 'no such file': 'Pass a valid error log path or a selector string as the first argument' });
+  handleToolError(err, {
+    'no such file': 'Pass a valid error log path or a selector string as the first argument',
+  });
 }
 
 healLocator(brokenSelector!, url).catch(err =>
   handleToolError(err, {
     'API key': 'Add GROQ_API_KEY=your_key to your .env file',
-    'URL': 'Usage: npx tsx ai-tools/locator-healer.ts "brokenSelector" https://example.com',
-    'load': 'Check the URL is publicly accessible',
+    URL: 'Usage: npx tsx ai-tools/locator-healer.ts "brokenSelector" https://example.com',
+    load: 'Check the URL is publicly accessible',
   })
 );

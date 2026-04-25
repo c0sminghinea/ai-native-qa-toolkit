@@ -14,12 +14,6 @@
     "rootDir": "./",
     "types": ["node", "@playwright/test"]
   },
-  "include": [
-    "**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "playwright-report"
-  ]
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "dist", "playwright-report"]
 }
