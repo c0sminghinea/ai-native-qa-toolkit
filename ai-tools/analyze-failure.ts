@@ -24,7 +24,8 @@ async function analyzeFailure(errorLog: string, testFile: string) {
       messages: [
         {
           role: 'system',
-          content: 'You are an expert Playwright QA engineer. Analyze test failures and provide clear, actionable fixes.'
+          content:
+            'You are an expert Playwright QA engineer. Analyze test failures and provide clear, actionable fixes.',
         },
         {
           role: 'user',
@@ -39,9 +40,9 @@ ${errorLog}
 Provide:
 1. ROOT CAUSE: What exactly caused this failure in 1-2 sentences
 2. FIX: The exact code change needed to fix it
-3. PREVENTION: One sentence on how to prevent this class of failure in future`
-        }
-      ]
+3. PREVENTION: One sentence on how to prevent this class of failure in future`,
+        },
+      ],
     });
 
     const analysis = result.choices[0].message.content!;
@@ -49,7 +50,6 @@ Provide:
     console.log(analysis);
     console.log('\n');
     saveReport('failure-analysis-report.md', `# Failure Analysis Report\n\n${analysis}`);
-
   } catch (err) {
     handleToolError(err, {
       'API key': 'Add GROQ_API_KEY=your_key to your .env file',
@@ -74,7 +74,11 @@ let errorLog: string;
 try {
   errorLog = process.argv[2] ? fs.readFileSync(process.argv[2], 'utf-8') : sampleError;
 } catch (err) {
-  handleToolError(err, { 'no such file': 'Pass a valid path to an error log file as the first argument' });
+  handleToolError(err, {
+    'no such file': 'Pass a valid path to an error log file as the first argument',
+  });
 }
 
-analyzeFailure(errorLog!, testFile);
+if (require.main === module) {
+  analyzeFailure(errorLog!, testFile);
+}

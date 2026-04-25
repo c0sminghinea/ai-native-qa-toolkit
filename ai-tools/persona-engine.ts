@@ -2,15 +2,18 @@ import { groqChat, MODELS } from './groq-client';
 import { ensureDir, parseAIJson, saveReport, DEFAULT_TARGET_URL } from './tool-utils';
 import { chromium } from '@playwright/test';
 import * as path from 'path';
+import { z } from 'zod';
 
-interface Persona {
-  name: string;
-  email: string;
-  timezone: string;
-  scenario: string;
-  edgeCase: string;
-  expectedRisk: 'low' | 'medium' | 'high';
-}
+const PersonaSchema = z.object({
+  name: z.string(),
+  email: z.string(),
+  timezone: z.string(),
+  scenario: z.string(),
+  edgeCase: z.string(),
+  expectedRisk: z.enum(['low', 'medium', 'high']),
+});
+
+type Persona = z.infer<typeof PersonaSchema>;
 
 function safeTimezoneId(timezone: string): string {
   try {
@@ -39,7 +42,8 @@ async function generatePersonas(): Promise<Persona[]> {
     messages: [
       {
         role: 'system',
-        content: 'You are a QA engineer specializing in edge case testing. Return ONLY valid JSON, no markdown, no explanation.'
+        content:
+          'You are a QA engineer specializing in edge case testing. Return ONLY valid JSON, no markdown, no explanation.',
       },
       {
         role: 'user',
@@ -67,15 +71,24 @@ Make personas diverse and realistic. Include cases like:
 - Users on mobile-sized viewports
 - Users with slow/unreliable connections (simulate with throttling)
 - Users who navigate back and forth before booking
-- Users in locales with different date formats`
-      }
-    ]
+- Users in locales with different date formats`,
+      },
+    ],
   });
 
-  return parseAIJson<Persona[]>(result.choices[0].message.content!, '[');
+  const raw = parseAIJson<unknown[]>(result.choices[0].message.content!, '[');
+  try {
+    return z.array(PersonaSchema).parse(raw);
+  } catch {
+    throw new Error('AI returned invalid persona data — re-running may fix it');
+  }
 }
 
-async function testPersona(persona: Persona, index: number, browser: import('@playwright/test').Browser): Promise<{
+async function testPersona(
+  persona: Persona,
+  index: number,
+  browser: import('@playwright/test').Browser
+): Promise<{
   persona: Persona;
   passed: boolean;
   findings: string[];
@@ -90,12 +103,14 @@ async function testPersona(persona: Persona, index: number, browser: import('@pl
   const safeTimezone = safeTimezoneId(persona.timezone);
 
   // Determine viewport from the persona's described edge case, not from index position
-  const isMobile = /mobile|smartphone|small.?screen/i.test(`${persona.edgeCase} ${persona.scenario}`);
+  const isMobile = /mobile|smartphone|small.?screen/i.test(
+    `${persona.edgeCase} ${persona.scenario}`
+  );
 
   const context = await browser.newContext({
     timezoneId: safeTimezone,
     locale: timezoneToLocale(safeTimezone),
-    viewport: isMobile ? { width: 375, height: 812 } : { width: 1280, height: 720 }
+    viewport: isMobile ? { width: 375, height: 812 } : { width: 1280, height: 720 },
   });
 
   const page = await context.newPage();
@@ -112,21 +127,36 @@ async function testPersona(persona: Persona, index: number, browser: import('@pl
     findings.push('✅ Page loaded successfully');
 
     // Check event title
-    const titleVisible = await page.getByTestId('event-title').isVisible().catch(() => false) ||
-                         await page.locator('h1').first().isVisible().catch(() => false);
+    const titleVisible =
+      (await page
+        .getByTestId('event-title')
+        .isVisible()
+        .catch(() => false)) ||
+      (await page
+        .locator('h1')
+        .first()
+        .isVisible()
+        .catch(() => false));
     if (titleVisible) {
       findings.push('✅ Event title visible');
     } else {
-      frictionPoints.push('⚠️  UX: Event title not immediately visible — user may not know what they are booking');
+      frictionPoints.push(
+        '⚠️  UX: Event title not immediately visible — user may not know what they are booking'
+      );
     }
 
     // Check if CTA / primary action is above the fold
-    const dateButton = page.getByRole('button').filter({ hasNot: page.locator('[disabled]') }).first();
+    const dateButton = page
+      .getByRole('button')
+      .filter({ hasNot: page.locator('[disabled]') })
+      .first();
     const dateButtonBox = await dateButton.boundingBox().catch(() => null);
     const pageViewport = page.viewportSize();
     if (dateButtonBox && pageViewport) {
       if (dateButtonBox.y > pageViewport.height) {
-        frictionPoints.push(`⚠️  UX: First available date button is below the fold (y=${Math.round(dateButtonBox.y)}px, viewport height=${pageViewport.height}px) — user must scroll to book`);
+        frictionPoints.push(
+          `⚠️  UX: First available date button is below the fold (y=${Math.round(dateButtonBox.y)}px, viewport height=${pageViewport.height}px) — user must scroll to book`
+        );
       } else {
         findings.push('✅ First available date is visible without scrolling');
       }
@@ -136,25 +166,41 @@ async function testPersona(persona: Persona, index: number, browser: import('@pl
     // stays correct regardless of when this runs
     const now = new Date();
     const currentMonthName = now.toLocaleString('en-US', { month: 'long' });
-    const nextMonthName = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-      .toLocaleString('en-US', { month: 'long' });
+    const nextMonthName = new Date(now.getFullYear(), now.getMonth() + 1, 1).toLocaleString(
+      'en-US',
+      { month: 'long' }
+    );
     const calendarVisible =
-      await page.getByText(currentMonthName).isVisible().catch(() => false) ||
-      await page.getByText(nextMonthName).isVisible().catch(() => false);
+      (await page
+        .getByText(currentMonthName)
+        .isVisible()
+        .catch(() => false)) ||
+      (await page
+        .getByText(nextMonthName)
+        .isVisible()
+        .catch(() => false));
     if (calendarVisible) {
       findings.push('✅ Calendar rendered correctly');
     } else {
-      frictionPoints.push('⚠️  UX: Calendar month label not visible — user cannot orient themselves in time');
+      frictionPoints.push(
+        '⚠️  UX: Calendar month label not visible — user cannot orient themselves in time'
+      );
     }
 
     // Click a date and check time slots
     await dateButton.click({ timeout: 3000 }).catch(() => null);
 
-    const timeSlotsVisible = await page.getByTestId('time').first().isVisible({ timeout: 5000 }).catch(() => false);
+    const timeSlotsVisible = await page
+      .getByTestId('time')
+      .first()
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
     if (timeSlotsVisible) {
       findings.push('✅ Time slots rendered after date selection');
     } else {
-      frictionPoints.push('⚠️  UX: Time slots did not appear after selecting a date — booking flow broken or delayed');
+      frictionPoints.push(
+        '⚠️  UX: Time slots did not appear after selecting a date — booking flow broken or delayed'
+      );
       passed = false;
     }
 
@@ -163,7 +209,9 @@ async function testPersona(persona: Persona, index: number, browser: import('@pl
     const timeSlotBox = await timeSlot.boundingBox().catch(() => null);
     if (timeSlotBox && pageViewport) {
       if (timeSlotBox.y > pageViewport.height) {
-        frictionPoints.push(`⚠️  UX: Time slot buttons are below the fold — user must scroll to complete booking (conversion risk)`);
+        frictionPoints.push(
+          `⚠️  UX: Time slot buttons are below the fold — user must scroll to complete booking (conversion risk)`
+        );
       } else {
         findings.push('✅ Time slot buttons visible without scrolling');
       }
@@ -176,7 +224,8 @@ async function testPersona(persona: Persona, index: number, browser: import('@pl
       messages: [
         {
           role: 'system',
-          content: 'You are a UX-focused QA engineer. Identify friction points and conversion risks. Be concise and specific.'
+          content:
+            'You are a UX-focused QA engineer. Identify friction points and conversion risks. Be concise and specific.',
         },
         {
           role: 'user',
@@ -189,13 +238,14 @@ async function testPersona(persona: Persona, index: number, browser: import('@pl
 
           List up to 3 UX friction points or conversion risks specific to this persona. 
           Each on a new line starting with "⚠️  UX:". 
-          If none, respond with "✅ No additional friction points identified."`
-        }
-      ]
+          If none, respond with "✅ No additional friction points identified."`,
+        },
+      ],
     });
 
     const aiFindings = aiAnalysis.choices[0].message.content!.trim();
-    aiFindings.split('\n')
+    aiFindings
+      .split('\n')
       .filter(line => line.trim().length > 0)
       .forEach(line => {
         if (line.includes('⚠️')) {
@@ -206,7 +256,6 @@ async function testPersona(persona: Persona, index: number, browser: import('@pl
       });
 
     await page.screenshot({ path: screenshotPath, fullPage: true });
-  
   } catch (err) {
     findings.push(`❌ Error: ${err}`);
     passed = false;
@@ -243,7 +292,9 @@ async function generateReport(results: Awaited<ReturnType<typeof testPersona>>[]
 
 ## Persona Results
 
-${results.map((r, i) => `
+${results
+  .map(
+    (r, i) => `
 ### Persona ${i + 1}: ${r.persona.name}
 - **Status:** ${r.passed ? '✅ Passed' : '❌ Failed'}
 - **Risk Level:** ${r.persona.expectedRisk.toUpperCase()}
@@ -257,20 +308,26 @@ ${r.findings.join('\n')}
 
 **UX Friction Points:**
 ${r.frictionPoints.length > 0 ? r.frictionPoints.join('\n') : '✅ No friction points identified'}
-`).join('\n---\n')}
+`
+  )
+  .join('\n---\n')}
 
 ## UX Friction Summary
-${results.flatMap(r => r.frictionPoints).length === 0 
-  ? '✅ No friction points detected across all personas.'
-  : results.flatMap(r => r.frictionPoints).join('\n')}
+${
+  results.flatMap(r => r.frictionPoints).length === 0
+    ? '✅ No friction points detected across all personas.'
+    : results.flatMap(r => r.frictionPoints).join('\n')
+}
 
 ---
 
 ## Risk Analysis
 
-${results.filter(r => !r.passed).length === 0 
-  ? '✅ All personas passed — no edge case failures detected.'
-  : `⚠️  ${failed} persona(s) failed. Review findings above for details.`}
+${
+  results.filter(r => !r.passed).length === 0
+    ? '✅ All personas passed — no edge case failures detected.'
+    : `⚠️  ${failed} persona(s) failed. Review findings above for details.`
+}
 
 ---
 *Generated by AI-Native QA Toolkit — Synthetic Persona Engine*`;
@@ -317,4 +374,6 @@ async function runPersonaEngine() {
   }
 }
 
-runPersonaEngine().catch(console.error);
+if (require.main === module) {
+  runPersonaEngine().catch(console.error);
+}

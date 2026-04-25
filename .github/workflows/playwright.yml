@@ -5,6 +5,9 @@ on:
     branches: [main, master, develop]
   pull_request:
     branches: [main, master, develop]
+  schedule:
+    # Nightly at 06:00 UTC — catches regressions from upstream site changes
+    - cron: '0 6 * * *'
 
 jobs:
   test:
@@ -38,6 +41,9 @@ jobs:
 
       - name: Lint
         run: npx eslint . --ext .ts
+
+      - name: Format check
+        run: npx prettier --check .
 
       - name: Run tests
         run: npx playwright test

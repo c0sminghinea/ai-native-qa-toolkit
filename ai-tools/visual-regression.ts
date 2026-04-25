@@ -4,7 +4,12 @@ import { chromium, type Browser } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 
-async function captureScreenshot(browser: Browser, url: string, name: string, viewport = { width: 1280, height: 720 }): Promise<string> {
+async function captureScreenshot(
+  browser: Browser,
+  url: string,
+  name: string,
+  viewport = { width: 1280, height: 720 }
+): Promise<string> {
   const context = await browser.newContext({ viewport });
   const page = await context.newPage();
   try {
@@ -22,7 +27,6 @@ async function captureScreenshot(browser: Browser, url: string, name: string, vi
     await page.screenshot({ path: screenshotPath, fullPage: false });
 
     return screenshotPath;
-
   } finally {
     await context.close();
   }
@@ -56,26 +60,27 @@ Analyze this screenshot and report on:
 4. CONVERSION RISKS: Any visual issues that could prevent a user from completing a booking?
 5. OVERALL SCORE: Rate the visual UX quality from 1-10
 
-Be specific. Reference actual elements you can see in the screenshot.`
+Be specific. Reference actual elements you can see in the screenshot.`,
             },
             {
               type: 'image_url',
               image_url: {
-                url: `data:image/png;base64,${base64Image}`
-              }
-            }
-          ]
-        }
-      ]
+                url: `data:image/png;base64,${base64Image}`,
+              },
+            },
+          ],
+        },
+      ],
     });
 
     return result.choices[0].message.content!;
-
   } catch (err) {
     if (err instanceof Error && err.message.includes('Screenshot not found')) {
       throw err;
     }
-    throw new Error(`AI vision analysis failed — ${err instanceof Error ? err.message : 'unknown error'}`);
+    throw new Error(
+      `AI vision analysis failed — ${err instanceof Error ? err.message : 'unknown error'}`
+    );
   }
 }
 
@@ -99,45 +104,52 @@ async function compareViewports(url: string) {
 
     const browser = await chromium.launch({ headless: true });
     try {
-    for (const vp of viewports) {
-      console.log(`📸 Capturing ${vp.label}...`);
+      for (const vp of viewports) {
+        console.log(`📸 Capturing ${vp.label}...`);
 
-      let screenshotPath: string;
-      try {
-        screenshotPath = await captureScreenshot(browser, url, vp.name, { width: vp.width, height: vp.height });
-      } catch (err) {
-        console.error(`⚠️  Screenshot failed for ${vp.label}: ${err instanceof Error ? err.message : err}`);
-        console.error('   Skipping this viewport and continuing...\n');
-        continue;
+        let screenshotPath: string;
+        try {
+          screenshotPath = await captureScreenshot(browser, url, vp.name, {
+            width: vp.width,
+            height: vp.height,
+          });
+        } catch (err) {
+          console.error(
+            `⚠️  Screenshot failed for ${vp.label}: ${err instanceof Error ? err.message : err}`
+          );
+          console.error('   Skipping this viewport and continuing...\n');
+          continue;
+        }
+
+        console.log(`🧠 Analyzing with AI vision...\n`);
+
+        let analysis: string;
+        try {
+          analysis = await analyzeScreenshot(
+            screenshotPath,
+            `This is a ${vp.label} viewport of a booking page. Focus on whether the booking flow is usable at this screen size.`
+          );
+        } catch (err) {
+          console.error(
+            `⚠️  AI analysis failed for ${vp.label}: ${err instanceof Error ? err.message : err}`
+          );
+          analysis = 'Analysis unavailable — AI vision request failed';
+        }
+
+        const scoreMatch = analysis.match(/(\d+)\/10|(\d+) out of 10/i);
+        const score = scoreMatch ? `${scoreMatch[1] || scoreMatch[2]}/10` : 'N/A';
+
+        console.log(`--- ${vp.label} ---`);
+        console.log(analysis);
+        console.log();
+
+        results.push({
+          viewport: vp.label,
+          score,
+          analysis,
+          screenshot: screenshotPath,
+        });
       }
-
-      console.log(`🧠 Analyzing with AI vision...\n`);
-
-      let analysis: string;
-      try {
-        analysis = await analyzeScreenshot(
-          screenshotPath,
-          `This is a ${vp.label} viewport of a booking page. Focus on whether the booking flow is usable at this screen size.`
-        );
-      } catch (err) {
-        console.error(`⚠️  AI analysis failed for ${vp.label}: ${err instanceof Error ? err.message : err}`);
-        analysis = 'Analysis unavailable — AI vision request failed';
-      }
-
-      const scoreMatch = analysis.match(/(\d+)\/10|(\d+) out of 10/i);
-      const score = scoreMatch ? `${scoreMatch[1] || scoreMatch[2]}/10` : 'N/A';
-
-      console.log(`--- ${vp.label} ---`);
-      console.log(analysis);
-      console.log();
-
-      results.push({
-        viewport: vp.label,
-        score,
-        analysis,
-        screenshot: screenshotPath
-      });
-    }
     } finally {
       await browser.close();
     }
@@ -164,27 +176,32 @@ ${results.map(r => `| ${r.viewport} | ${r.score} | visual-regression/${r.viewpor
 
 ## Detailed Analysis
 
-${results.map(r => `
+${results
+  .map(
+    r => `
 ### ${r.viewport}
 
 ${r.analysis}
 
 ---
-`).join('\n')}
+`
+  )
+  .join('\n')}
 
 *Generated by AI-Native QA Toolkit — Visual Regression Module*
 `;
 
     saveReport('visual-regression-report.md', report);
     console.log('📸 Screenshots saved to: visual-regression/');
-
   } catch (err) {
     handleToolError(err, {
       'API key': 'Add GROQ_API_KEY=your_key to your .env file',
-      'URL': 'Usage: npx tsx ai-tools/visual-regression.ts https://example.com',
+      URL: 'Usage: npx tsx ai-tools/visual-regression.ts https://example.com',
     });
   }
 }
 
-const url = process.argv[2] || DEFAULT_TARGET_URL;
-compareViewports(url);
+if (require.main === module) {
+  const url = process.argv[2] || DEFAULT_TARGET_URL;
+  compareViewports(url);
+}

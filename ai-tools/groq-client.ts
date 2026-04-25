@@ -1,6 +1,8 @@
 import * as dotenv from 'dotenv';
 import Groq from 'groq-sdk';
-import { sleep } from './tool-utils';
+
+// Kept local — not re-exported; the only caller is the retry loop below.
+const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
 dotenv.config();
 

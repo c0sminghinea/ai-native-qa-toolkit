@@ -27,18 +27,41 @@
     "test:chromium": "playwright test --project=chromium",
     "test:firefox": "playwright test --project=firefox",
     "test:webkit": "playwright test --project=webkit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "prepare": "husky",
+    "prepare": "husky"
   },
-  "keywords": ["playwright", "ai", "qa", "testing", "mcp", "llm"],
+  "keywords": [
+    "playwright",
+    "ai",
+    "qa",
+    "testing",
+    "mcp",
+    "llm"
+  ],
   "author": "X",
   "license": "ISC",
   "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
+  "lint-staged": {
+    "*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@types/node": "^25.5.0",
     "@typescript-eslint/eslint-plugin": "^8.59.0",
     "@typescript-eslint/parser": "^8.59.0",
     "eslint": "^9.39.4",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "prettier": "^3.8.3",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"

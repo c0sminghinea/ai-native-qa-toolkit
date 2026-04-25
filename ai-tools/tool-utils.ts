@@ -37,9 +37,7 @@ export function parseAIJson<T>(raw: string, opener: '{' | '[' = '{'): T {
 export function handleToolError(err: unknown, hints: Record<string, string> = {}): never {
   if (err instanceof Error) {
     console.error('\n❌ Error:', err.message);
-    const matchedHint = Object.entries(hints).find(([keyword]) =>
-      err.message.includes(keyword)
-    );
+    const matchedHint = Object.entries(hints).find(([keyword]) => err.message.includes(keyword));
     if (matchedHint) {
       console.error(`💡 ${matchedHint[1]}`);
     } else {
@@ -51,7 +49,10 @@ export function handleToolError(err: unknown, hints: Record<string, string> = {}
   process.exit(1);
 }
 
-/** Pauses execution for a given number of milliseconds. */
+/**
+ * @internal Used only by groq-client for retry backoff.
+ * Prefer waitForLoadState() for browser waits.
+ */
 export function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }

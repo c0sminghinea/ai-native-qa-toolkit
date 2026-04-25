@@ -9,7 +9,9 @@ const MAX_FILE_CHARS = 8000;
 function readWithTruncationWarning(filePath: string, label: string): string {
   const content = fs.readFileSync(filePath, 'utf-8');
   if (content.length > MAX_FILE_CHARS) {
-    console.warn(`⚠️  ${label} is ${content.length} chars — truncated to ${MAX_FILE_CHARS} for analysis`);
+    console.warn(
+      `⚠️  ${label} is ${content.length} chars — truncated to ${MAX_FILE_CHARS} for analysis`
+    );
     return content.substring(0, MAX_FILE_CHARS);
   }
   return content;
@@ -20,7 +22,8 @@ function collectPomContext(testFilePath: string): string {
   const pagesDir = path.join(path.dirname(testFilePath), 'pages');
   if (!fs.existsSync(pagesDir)) return '';
 
-  const pomFiles = fs.readdirSync(pagesDir)
+  const pomFiles = fs
+    .readdirSync(pagesDir)
     .filter(f => f.endsWith('.ts'))
     .map(f => path.join(pagesDir, f));
 
@@ -52,17 +55,20 @@ function collectSuiteContext(testFilePath: string): string {
   const dir = path.dirname(testFilePath);
   const targetBase = path.basename(testFilePath);
 
-  const otherSpecs = fs.readdirSync(dir)
+  const otherSpecs = fs
+    .readdirSync(dir)
     .filter(f => f.endsWith('.spec.ts') && f !== targetBase)
     .map(f => path.join(dir, f));
 
   if (otherSpecs.length === 0) return '';
 
-  const sections = otherSpecs.map(f => {
-    const names = extractTestNames(f);
-    if (names.length === 0) return '';
-    return `${path.basename(f)}:\n${names.map(n => `  - "${n}"`).join('\n')}`;
-  }).filter(Boolean);
+  const sections = otherSpecs
+    .map(f => {
+      const names = extractTestNames(f);
+      if (names.length === 0) return '';
+      return `${path.basename(f)}:\n${names.map(n => `  - "${n}"`).join('\n')}`;
+    })
+    .filter(Boolean);
 
   return sections.join('\n\n');
 }
@@ -105,7 +111,8 @@ async function adviseCoverage(testFile: string) {
       messages: [
         {
           role: 'system',
-          content: 'You are a senior QA engineer specializing in test coverage analysis. Be specific and practical. When writing test code, use ONLY the locators and methods available in the provided Page Object Model.'
+          content:
+            'You are a senior QA engineer specializing in test coverage analysis. Be specific and practical. When writing test code, use ONLY the locators and methods available in the provided Page Object Model.',
         },
         {
           role: 'user',
@@ -135,9 +142,9 @@ TOP 3 TESTS TO ADD:
 
 3. Test name: [name]
    Why: [one sentence on why this matters]
-   Code: [the actual Playwright test code using the POM locators above]`
-        }
-      ]
+   Code: [the actual Playwright test code using the POM locators above]`,
+        },
+      ],
     });
 
     const advice = result.choices[0].message.content!;
@@ -145,15 +152,20 @@ TOP 3 TESTS TO ADD:
     console.log(advice);
 
     const baseName = path.basename(testFile, '.spec.ts').replace(/[^a-z0-9-]/gi, '-');
-    saveReport(`coverage-${baseName}-report.md`, `# Coverage Advisor Report\n\n**Analyzed:** \`${testFile}\`  \n**Date:** ${new Date().toISOString().split('T')[0]}\n\n${advice}`);
-
+    saveReport(
+      `coverage-${baseName}-report.md`,
+      `# Coverage Advisor Report\n\n**Analyzed:** \`${testFile}\`  \n**Date:** ${new Date().toISOString().split('T')[0]}\n\n${advice}`
+    );
   } catch (err) {
     handleToolError(err, {
       'API key': 'Add GROQ_API_KEY=your_key to your .env file',
-      'not found': 'Run with a valid path: npx tsx ai-tools/coverage-advisor.ts tests/booking-flow.spec.ts',
+      'not found':
+        'Run with a valid path: npx tsx ai-tools/coverage-advisor.ts tests/booking-flow.spec.ts',
     });
   }
 }
 
 const testFile = process.argv[2] || path.join(process.cwd(), 'tests', 'booking-flow.spec.ts');
-adviseCoverage(testFile);
+if (require.main === module) {
+  adviseCoverage(testFile);
+}

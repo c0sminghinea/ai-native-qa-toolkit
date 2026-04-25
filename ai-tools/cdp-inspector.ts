@@ -41,15 +41,15 @@ async function inspectWithCDP(url: string) {
   await cdpSession.send('Fetch.enable', {
     patterns: [
       { urlPattern: '*/api/trpc/slots*', requestStage: 'Request' },
-      { urlPattern: '*/api/auth/session*', requestStage: 'Request' }
-    ]
+      { urlPattern: '*/api/auth/session*', requestStage: 'Request' },
+    ],
   });
 
   let interceptedRequests = 0;
   const interceptedLog: string[] = [];
 
   // Intercept and optionally mock API responses
-  cdpSession.on('Fetch.requestPaused', async (params) => {
+  cdpSession.on('Fetch.requestPaused', async params => {
     interceptedRequests++;
     const url = params.request.url;
     interceptedLog.push(`Intercepted: ${params.request.method} ${url.substring(0, 80)}`);
@@ -61,23 +61,23 @@ async function inspectWithCDP(url: string) {
       await cdpSession.send('Fetch.fulfillRequest', {
         requestId: params.requestId,
         responseCode: 200,
-        responseHeaders: [
-          { name: 'content-type', value: 'application/json' }
-        ],
-        body: Buffer.from(JSON.stringify({
-          result: { data: { json: { slots: {} } } }
-        })).toString('base64')
+        responseHeaders: [{ name: 'content-type', value: 'application/json' }],
+        body: Buffer.from(
+          JSON.stringify({
+            result: { data: { json: { slots: {} } } },
+          })
+        ).toString('base64'),
       });
     } else {
       // Pass all other requests through normally
       await cdpSession.send('Fetch.continueRequest', {
-        requestId: params.requestId
+        requestId: params.requestId,
       });
     }
   });
 
   // Capture all network requests via CDP
-  cdpSession.on('Network.requestWillBeSent', (params) => {
+  cdpSession.on('Network.requestWillBeSent', params => {
     networkRequests.push({
       url: params.request.url,
       method: params.request.method,
@@ -86,7 +86,7 @@ async function inspectWithCDP(url: string) {
   });
 
   // Capture network responses via CDP
-  cdpSession.on('Network.responseReceived', (params) => {
+  cdpSession.on('Network.responseReceived', params => {
     const request = networkRequests.find(r => r.url === params.response.url);
     if (request) {
       request.status = params.response.status;
@@ -94,10 +94,10 @@ async function inspectWithCDP(url: string) {
   });
 
   // Capture console messages via CDP
-  cdpSession.on('Console.messageAdded', (params) => {
+  cdpSession.on('Console.messageAdded', params => {
     consoleMessages.push({
       type: params.message.level,
-      text: params.message.text
+      text: params.message.text,
     });
     if (params.message.level === 'error') {
       errors.push(params.message.text);
@@ -105,9 +105,8 @@ async function inspectWithCDP(url: string) {
   });
 
   // Capture JavaScript exceptions via CDP Runtime domain
-  cdpSession.on('Runtime.exceptionThrown', (params) => {
-    const desc = params.exceptionDetails.exception?.description || 
-                 params.exceptionDetails.text;
+  cdpSession.on('Runtime.exceptionThrown', params => {
+    const desc = params.exceptionDetails.exception?.description || params.exceptionDetails.text;
     errors.push(`JS Exception: ${desc}`);
   });
 
@@ -120,9 +119,12 @@ async function inspectWithCDP(url: string) {
     // Simulate a user interaction to capture dynamic requests
     console.log('👆 Simulating user interaction...\n');
     try {
-      const dateButton = page.getByRole('button').filter({
-        hasNot: page.locator('[disabled]')
-      }).first();
+      const dateButton = page
+        .getByRole('button')
+        .filter({
+          hasNot: page.locator('[disabled]'),
+        })
+        .first();
       await dateButton.click({ timeout: 3000 });
       await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     } catch {
@@ -138,19 +140,13 @@ async function inspectWithCDP(url: string) {
   interceptedLog.forEach(l => console.log(`   ${l}`));
   console.log();
 
-  const apiRequests = networkRequests.filter(r =>
-    r.url.includes('/api/') ||
-    r.url.includes('trpc') ||
-    r.url.includes('graphql')
+  const apiRequests = networkRequests.filter(
+    r => r.url.includes('/api/') || r.url.includes('trpc') || r.url.includes('graphql')
   );
 
-  const failedRequests = networkRequests.filter(r =>
-    r.status && r.status >= 400
-  );
+  const failedRequests = networkRequests.filter(r => r.status && r.status >= 400);
 
-  const slowRequests = networkRequests.filter(r =>
-    r.timing && r.timing > 1000
-  );
+  const slowRequests = networkRequests.filter(r => r.timing && r.timing > 1000);
 
   // Print raw findings
   console.log(`📊 CDP Session Results:`);
@@ -183,7 +179,8 @@ async function inspectWithCDP(url: string) {
     messages: [
       {
         role: 'system',
-        content: 'You are a senior QA engineer specializing in browser protocol debugging and network analysis.'
+        content:
+          'You are a senior QA engineer specializing in browser protocol debugging and network analysis.',
       },
       {
         role: 'user',
@@ -199,7 +196,12 @@ NETWORK SUMMARY:
 - Resource types: ${[...new Set(networkRequests.map(r => r.resourceType))].join(', ')}
 
 API CALLS DETECTED:
-${apiRequests.slice(0, 10).map(r => `- ${r.method} ${r.url} [${r.status || 'no response'}]`).join('\n') || 'None'}
+${
+  apiRequests
+    .slice(0, 10)
+    .map(r => `- ${r.method} ${r.url} [${r.status || 'no response'}]`)
+    .join('\n') || 'None'
+}
 
 FAILED REQUESTS:
 ${failedRequests.map(r => `- ${r.method} ${r.url} [${r.status}]`).join('\n') || 'None'}
@@ -208,15 +210,20 @@ CONSOLE ERRORS:
 ${errors.join('\n') || 'None'}
 
 CONSOLE MESSAGES:
-${consoleMessages.slice(0, 10).map(m => `[${m.type}] ${m.text}`).join('\n') || 'None'}
+${
+  consoleMessages
+    .slice(0, 10)
+    .map(m => `[${m.type}] ${m.text}`)
+    .join('\n') || 'None'
+}
 
 Provide:
 1. HEALTH ASSESSMENT: Overall browser-level health of this page (Good/Warning/Critical)
 2. API RISKS: Any concerns about the API calls observed
 3. ERROR ANALYSIS: What the console errors indicate if any
-4. QA RECOMMENDATIONS: 2-3 specific things to test based on what you observed at the protocol level`
-      }
-    ]
+4. QA RECOMMENDATIONS: 2-3 specific things to test based on what you observed at the protocol level`,
+      },
+    ],
   });
 
   const analysis = result.choices[0].message.content!;
@@ -258,5 +265,7 @@ ${analysis}
   saveReport('cdp-report.md', report);
 }
 
-const url = process.argv[2] || DEFAULT_TARGET_URL;
-inspectWithCDP(url).catch(console.error);
+if (require.main === module) {
+  const url = process.argv[2] || DEFAULT_TARGET_URL;
+  inspectWithCDP(url).catch(console.error);
+}

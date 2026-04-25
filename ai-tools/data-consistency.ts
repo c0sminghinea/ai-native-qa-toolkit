@@ -45,7 +45,8 @@ async function extractDataFromPage(
       messages: [
         {
           role: 'system',
-          content: 'You are a data extraction assistant. Extract specific values from page content. Be precise and concise. Return ONLY the extracted value or "NOT_FOUND" if the value is not present.'
+          content:
+            'You are a data extraction assistant. Extract specific values from page content. Be precise and concise. Return ONLY the extracted value or "NOT_FOUND" if the value is not present.',
         },
         {
           role: 'user',
@@ -60,9 +61,9 @@ Rules:
 - Return ONLY the exact value you found (e.g. "$25/night", "4.8 stars", "John Smith")
 - If you find multiple values for the same data point, return them all separated by " | "
 - If not found, return exactly: NOT_FOUND
-- Do not include any explanation`
-        }
-      ]
+- Do not include any explanation`,
+        },
+      ],
     });
 
     const extracted = result.choices[0].message.content!.trim();
@@ -73,9 +74,8 @@ Rules:
       url,
       value: found ? extracted : null,
       context: pageText.substring(0, 500),
-      found
+      found,
     };
-
   } finally {
     await context.close(); // reuse the shared browser — only close this context
   }
@@ -91,7 +91,7 @@ async function analyzeConsistency(
     return {
       consistent: false,
       discrepancies: [`"${dataKey}" was not found on any page`],
-      aiAnalysis: `The data point "${dataKey}" could not be located on any of the tested pages.`
+      aiAnalysis: `The data point "${dataKey}" could not be located on any of the tested pages.`,
     };
   }
 
@@ -112,7 +112,8 @@ async function analyzeConsistency(
     messages: [
       {
         role: 'system',
-        content: 'You are a QA engineer specializing in data integrity testing for marketplace platforms.'
+        content:
+          'You are a QA engineer specializing in data integrity testing for marketplace platforms.',
       },
       {
         role: 'user',
@@ -124,21 +125,19 @@ async function analyzeConsistency(
         1. CONSISTENCY STATUS: Is this data consistent across all pages? (Yes/No)
         2. RISK LEVEL: What is the business risk if this data is inconsistent? (Low/Medium/High/Critical)
         3. IMPACT: One sentence on how this inconsistency could affect users or the business
-        4. RECOMMENDATION: One specific action to fix or prevent this issue`
-    }
-  ]
+        4. RECOMMENDATION: One specific action to fix or prevent this issue`,
+      },
+    ],
   });
 
   return {
     consistent: isConsistent,
     discrepancies,
-    aiAnalysis: result.choices[0].message.content!
+    aiAnalysis: result.choices[0].message.content!,
   };
 }
 
-async function runDataConsistencyCheck(
-  dataPoints: { key: string; pages: PageCheck[] }[]
-) {
+async function runDataConsistencyCheck(dataPoints: { key: string; pages: PageCheck[] }[]) {
   console.log('\n🔍 Data Consistency Checker');
   console.log('============================\n');
   console.log('Verifying data integrity across marketplace pages...\n');
@@ -158,17 +157,22 @@ async function runDataConsistencyCheck(
         console.log(`   🌐 Visiting ${pageCheck.name}...`);
         let dataPoint: DataPoint;
         try {
-          dataPoint = await extractDataFromPage(
-            pageCheck.url,
-            check.key,
-            pageCheck.name,
-            browser
-          );
+          dataPoint = await extractDataFromPage(pageCheck.url, check.key, pageCheck.name, browser);
         } catch (err) {
-          console.error(`   ❌ Failed to visit ${pageCheck.name}: ${err instanceof Error ? err.message : err}`);
-          dataPoint = { page: pageCheck.name, url: pageCheck.url, value: null, context: '', found: false };
+          console.error(
+            `   ❌ Failed to visit ${pageCheck.name}: ${err instanceof Error ? err.message : err}`
+          );
+          dataPoint = {
+            page: pageCheck.name,
+            url: pageCheck.url,
+            value: null,
+            context: '',
+            found: false,
+          };
         }
-        console.log(`   ${dataPoint.found ? '✅' : '❌'} ${pageCheck.name}: ${dataPoint.value || 'NOT FOUND'}`);
+        console.log(
+          `   ${dataPoint.found ? '✅' : '❌'} ${pageCheck.name}: ${dataPoint.value || 'NOT FOUND'}`
+        );
         extractedData.push(dataPoint);
       }
 
@@ -179,7 +183,7 @@ async function runDataConsistencyCheck(
         consistent: analysis.consistent,
         values: extractedData,
         discrepancies: analysis.discrepancies,
-        aiAnalysis: analysis.aiAnalysis
+        aiAnalysis: analysis.aiAnalysis,
       };
 
       results.push(result);
@@ -222,7 +226,9 @@ async function generateReport(results: ConsistencyResult[]) {
 
 ## Results
 
-${results.map(r => `
+${results
+  .map(
+    r => `
 ### ${r.consistent ? '✅' : '❌'} "${r.dataKey}"
 
 **Status:** ${r.consistent ? 'Consistent across all pages' : 'Inconsistent — discrepancies found'}
@@ -233,7 +239,9 @@ ${r.values.map(v => `- **${v.page}:** ${v.found ? `\`${v.value}\`` : '❌ Not fo
 ${!r.consistent && r.discrepancies.length > 0 ? `**Discrepancies:**\n${r.discrepancies.map(d => `- ${d}`).join('\n')}\n` : ''}
 **AI Analysis:**
 ${r.aiAnalysis}
-`).join('\n---\n')}
+`
+  )
+  .join('\n---\n')}
 
 ---
 
@@ -272,14 +280,14 @@ const checksToRun = [
       {
         name: 'Profile Page',
         url: PROFILE_URL,
-        description: 'Main profile listing page'
+        description: 'Main profile listing page',
       },
       {
         name: 'Event Page',
         url: EVENT_URL,
-        description: 'Individual event booking page'
-      }
-    ]
+        description: 'Individual event booking page',
+      },
+    ],
   },
   {
     key: 'event duration',
@@ -287,14 +295,14 @@ const checksToRun = [
       {
         name: 'Profile Page',
         url: PROFILE_URL,
-        description: 'Duration shown on profile listing'
+        description: 'Duration shown on profile listing',
       },
       {
         name: 'Event Page',
         url: EVENT_URL,
-        description: 'Duration shown on booking page'
-      }
-    ]
+        description: 'Duration shown on booking page',
+      },
+    ],
   },
   {
     key: 'meeting platform (Google Meet / Zoom / location)',
@@ -302,15 +310,17 @@ const checksToRun = [
       {
         name: 'Profile Page',
         url: PROFILE_URL,
-        description: 'Meeting platform shown on profile'
+        description: 'Meeting platform shown on profile',
       },
       {
         name: 'Event Page',
         url: EVENT_URL,
-        description: 'Meeting platform shown on booking page'
-      }
-    ]
-  }
+        description: 'Meeting platform shown on booking page',
+      },
+    ],
+  },
 ];
 
-runDataConsistencyCheck(checksToRun).catch(console.error);
+if (require.main === module) {
+  runDataConsistencyCheck(checksToRun).catch(console.error);
+}
