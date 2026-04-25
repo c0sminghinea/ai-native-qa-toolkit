@@ -1,0 +1,50 @@
+{
+  "$schema": "Declarative checks for ai-tools/data-consistency.ts. URL fields support {TARGET.bookingUrl}, {TARGET.profileUrl}, {TARGET.baseUrl} placeholders. Override per-project or pass --checks <path>.",
+  "checks": [
+    {
+      "key": "host name",
+      "pages": [
+        {
+          "name": "Profile Page",
+          "url": "{TARGET.profileUrl}",
+          "description": "Main profile listing page"
+        },
+        {
+          "name": "Event Page",
+          "url": "{TARGET.bookingUrl}",
+          "description": "Individual event booking page"
+        }
+      ]
+    },
+    {
+      "key": "event duration",
+      "pages": [
+        {
+          "name": "Profile Page",
+          "url": "{TARGET.profileUrl}",
+          "description": "Duration on profile listing"
+        },
+        {
+          "name": "Event Page",
+          "url": "{TARGET.bookingUrl}",
+          "description": "Duration on booking page"
+        }
+      ]
+    },
+    {
+      "key": "meeting platform (Google Meet / Zoom / location)",
+      "pages": [
+        {
+          "name": "Profile Page",
+          "url": "{TARGET.profileUrl}",
+          "description": "Meeting platform on profile"
+        },
+        {
+          "name": "Event Page",
+          "url": "{TARGET.bookingUrl}",
+          "description": "Meeting platform on booking page"
+        }
+      ]
+    }
+  ]
+}

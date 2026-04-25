@@ -38,6 +38,14 @@ jobs:
           restore-keys: |
             playwright-${{ runner.os }}-
 
+      - name: Cache Groq AI responses
+        uses: actions/cache@v4
+        with:
+          path: .cache/groq
+          key: groq-${{ runner.os }}-${{ hashFiles('ai-tools/**/*.ts') }}
+          restore-keys: |
+            groq-${{ runner.os }}-
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
 
@@ -50,12 +58,19 @@ jobs:
       - name: Format check
         run: npx prettier --check .
 
+      - name: Unit tests (vitest)
+        run: npm run test:unit
+
+      - name: README drift check
+        run: npm run check:docs
+
       - name: Run tests
         run: npx playwright test
         env:
           # Set BASE_URL as a GitHub Actions variable (not secret) to override target
           BASE_URL: ${{ vars.BASE_URL || 'https://cal.com' }}
           CI: true
+          GROQ_CACHE: '1'
 
       - name: Upload test report
         if: always()

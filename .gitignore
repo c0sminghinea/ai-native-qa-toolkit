@@ -1,5 +1,8 @@
 node_modules/
 .env
+.env.local
+.cache/
+runs/
 playwright-report/
 test-results/
 agent-screenshots/
@@ -10,3 +13,6 @@ dist/
 mcp-config.json
 *-report.md
 .DS_Store
+
+# AI-generated spec — regenerated on demand by `npm run generate-tests`
+tests/ai-generated.spec.ts

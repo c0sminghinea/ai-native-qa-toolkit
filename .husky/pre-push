@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# Pre-push gate: run the same fast checks CI runs, before the push hits the wire.
+# Skip with `git push --no-verify` if you really need to.
+npm run typecheck && npm run test:unit && npx tsx scripts/check-readme.ts

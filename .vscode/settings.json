@@ -3,5 +3,8 @@
   "editor.spellCheck": true,
   "workbench.colorCustomizations": {
     "editorError.foreground": "#00000000"
+  },
+  "chat.tools.terminal.autoApprove": {
+    "npx vitest": true
   }
 }

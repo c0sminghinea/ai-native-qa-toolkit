@@ -4,28 +4,57 @@ An autonomous, AI-powered QA ecosystem built on top of Playwright. Goes beyond s
 test scripts — uses LLM inference to generate tests, diagnose failures, audit coverage,
 browse autonomously, stress-test with synthetic personas, and analyze visual UX across viewports.
 
-Built against the cal.com open-source scheduling platform as a real-world target.
+Built against the [cal.com](https://cal.com) open-source scheduling platform
+as the default real-world target — but the cal.com-specific configuration is
+isolated to a single module ([`ai-tools/selectors.ts`](ai-tools/selectors.ts)),
+so the toolkit can be re-pointed at any booking/scheduling app via env vars
+or a small edit. See [Targeting your own app](#targeting-your-own-app) below.
 
 ---
 
 ## Architecture
 
-```text
-                        ┌─────────────────────────┐
-                        │   AI-Native QA Toolkit  │
-                        └────────────┬────────────┘
-                                     │
-          ┌──────────────────────────┼──────────────────────────┐
-          │                          │                          │
-   ┌──────▼──────┐          ┌────────▼────────┐         ┌───────▼───────┐
-   │  AI Tools   │          │  Playwright E2E │         │  Autonomous   │
-   │  (9 tools)  │          │  Test Suite     │         │  Agent        │
-   └──────┬──────┘          └────────┬────────┘         └───────┬───────┘
-          │                          │                          │
-   ┌──────▼──────────────────────────▼──────────────────────────▼───────┐
-   │                         Groq LLM API                               │
-   │              (llama-3.3-70b-versatile + llama-4-scout vision)      │
-   └────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+  subgraph Config["Target configuration (one place)"]
+    TARGET["TARGET registry<br/>(env-driven)"]
+    SELECTORS["SELECTORS map<br/>+ optional selectors.json"]
+    CHECKS["qa-checks.json<br/>(declarative checks)"]
+  end
+
+  subgraph Tools["AI Tools"]
+    GEN["generate-tests"]
+    ANALYZE["analyze-failure"]
+    COVERAGE["coverage-advisor"]
+    AGENT["browser-agent"]
+    PERSONA["persona-engine"]
+    VISUAL["visual-regression"]
+    DATA["data-consistency"]
+    CDP["cdp-inspector"]
+    HEAL["locator-healer"]
+    DISCOVER["discover-selectors"]
+  end
+
+  subgraph Runtime["Shared runtime"]
+    PROVIDER["LLMProvider interface<br/>(getProvider)"]
+    GROQ["Groq adapter<br/>(retry + cache + stats)"]
+    UTILS["tool-utils<br/>(withBrowser, wrapUntrusted, ...)"]
+    TELEMETRY["run-telemetry<br/>(runs/&lt;ts&gt;.json)"]
+  end
+
+  CLI["cli.ts dispatcher"] --> Tools
+  MCP["mcp-server.ts"] --> Tools
+  E2E["Playwright E2E suite"] --> SELECTORS
+
+  Tools --> UTILS
+  Tools --> PROVIDER
+  PROVIDER --> GROQ
+  GROQ --> LLM[("Groq API<br/>llama-3.3 / llama-4-scout")]
+  Tools -.writes.-> REPORTS[("*-report.md<br/>+ runs/<ts>.json")]
+  Tools --> TELEMETRY
+  TELEMETRY -.writes.-> REPORTS
+
+  Config --> Tools
 ```
 
 ---
@@ -44,8 +73,16 @@ qa-playwright/
     data-consistency.ts     # Verify data integrity across marketplace pages
     cdp-inspector.ts        # Browser protocol debugging via CDP session
     locator-healer.ts       # AI-powered broken locator healing
-    groq-client.ts          # Shared Groq client (LLM + vision) with retry backoff
-    tool-utils.ts           # Shared utilities: sleep, saveReport, parseAIJson, constants
+    discover-selectors.ts   # Auto-discover data-testid mappings via LLM
+    dom-snapshot.ts         # Shared DOM-context snapshot helper (used by healer + MCP)
+    groq-client.ts          # Groq client with retry, response cache, and token tracking
+    llm-provider.ts         # LLMProvider interface + Groq adapter (multi-provider ready)
+    run-telemetry.ts        # Per-run JSON telemetry under runs/<timestamp>.json
+    tool-utils.ts           # Shared utilities: CLI flags, logger, URL/path/selector guards, report writer
+  scripts/
+    check-readme.ts         # Verifies every README command/file reference still resolves
+  tests-unit/
+    tool-utils.test.ts      # Vitest unit tests for shared helpers
   docs/
     cal-com-qa-audit.md     # Full QA audit of cal.com codebase
   tests/
@@ -56,10 +93,11 @@ qa-playwright/
   visual-regression/        # Screenshots from visual regression runs
   persona-screenshots/      # Screenshots from persona engine runs
   agent-screenshots/        # Screenshots from autonomous agent runs
-  # Generated reports (*-report.md) are gitignored — created by each tool run
+  # Generated reports (*-report.md) and the .cache/ directory are gitignored
   .env.example                 # Environment variable template
-  .github/workflows/playwright.yml  # CI — runs tests on every push/PR
+  .github/workflows/playwright.yml  # CI — typecheck, lint, format, unit tests, drift check, e2e
   eslint.config.mjs            # ESLint flat config with TypeScript rules
+  vitest.config.ts             # Vitest config — unit tests live in tests-unit/
   mcp-server.ts                # MCP server exposing all tools to LLM clients
   mcp-config.json              # MCP client configuration for Claude Code/Cursor
   mcp-playwright-demo.ts       # Official @playwright/mcp server demo — LLM-controlled browser
@@ -105,9 +143,64 @@ npx playwright test --headed
 npx playwright show-report
 ```
 
+### Unit tests
+
+Helpers in [tool-utils.ts](ai-tools/tool-utils.ts) (URL/path/selector guards,
+CLI flag parser, AI-JSON parser) are covered by Vitest unit tests under
+[tests-unit/](tests-unit/tool-utils.test.ts).
+
+```bash
+npm run test:unit         # run once
+npm run test:unit:watch   # watch mode
+```
+
+### Doc drift check
+
+[scripts/check-readme.ts](scripts/check-readme.ts) verifies every `npm run X`
+and `npx tsx path/file.ts` reference in this README still resolves \u2014 catches
+docs that drift out of sync with `package.json` scripts or renamed files.
+
+```bash
+npm run check:docs
+```
+
 ---
 
 ## AI Tools
+
+### CLI conventions (all 9 tools)
+
+Every tool in `ai-tools/` accepts the same standard flags and produces a
+predictable result:
+
+| Flag | Effect |
+| --- | --- |
+| `--help`, `-h` | Print usage and exit 0 |
+| `--json` | Emit a single machine-parseable JSON line on stdout (mid-flow logs go to stderr) |
+| `--quiet`, `-q` | Suppress progress prose; reports still write to disk |
+
+Tools that have a clear pass/fail signal exit with code **1** when the signal
+is negative, so they can gate CI:
+
+| Tool | Exits 1 when |
+| --- | --- |
+| `coverage-advisor` | AI score \u2264 5/10 |
+| `visual-regression` | Worst viewport score \u2264 5/10 |
+| `data-consistency` | Any data point inconsistent across pages |
+| `persona-engine` | Any persona run fails |
+| `browser-agent` | Goal could not be completed (or max steps reached) |
+| `locator-healer` | No verified visible replacement found |
+
+### Observability and caching
+
+The shared Groq client tracks every call and writes a summary to
+`.cache/run-stats.json` on process exit (calls, prompt/completion tokens,
+retries, cache hits, model breakdown). Two opt-in env vars expose more:
+
+| Env var | Effect |
+| --- | --- |
+| `GROQ_CACHE=1` | Cache responses on disk under `.cache/groq/<hash>.json` \u2014 great for replaying dev runs without burning quota |
+| `GROQ_VERBOSE=1` | Log every retry and the final per-call token count |
 
 ### 1. Test Generator
 
@@ -484,6 +577,7 @@ npx tsx cli.ts <command> [options]
 | `consistency` | Data consistency checker |
 | `cdp <url>` | CDP browser protocol inspector |
 | `heal [selector] [url]` | Heal a broken locator with AI suggestions |
+| `discover <url>` | Auto-discover `data-testid` selectors via LLM (writes `selectors.json`) |
 | `mcp <url>` | Playwright MCP server demo |
 | `test` | Run the full Playwright test suite |
 | `report` | Open the Playwright trace viewer |
@@ -501,7 +595,7 @@ npx tsx cli.ts test
 
 ### Prerequisites
 
-- Node.js v18+
+- Node.js v20+
 - A Groq API key — free at [console.groq.com](https://console.groq.com)
 
 ### Install
@@ -524,21 +618,65 @@ GROQ_API_KEY=your_key_here       # Required — get it free from console.groq.co
 BASE_URL=https://cal.com         # Optional — target base URL (default: https://cal.com)
 HOST_NAME=Bailey Pumfleet        # Optional — expected host name in assertions
 BOOKING_PATH=/bailey/chat        # Optional — booking page path (default: /bailey/chat)
+QA_TARGET_NAME=cal.com           # Optional — short label used in CLI help / logs
+QA_TARGET_DESCRIPTION=...        # Optional — sentence injected into LLM prompts
 ```
+
+### Targeting your own app
+
+The toolkit ships pre-configured for [cal.com](https://cal.com) as a real-world
+example, but everything cal.com-specific lives in **one** module:
+[`ai-tools/selectors.ts`](ai-tools/selectors.ts). To point at your own app:
+
+1. **URL & paths** — set `BASE_URL` and `BOOKING_PATH` env vars (no code change
+   needed). The `TARGET` object derives the booking and profile URLs from these
+   automatically.
+2. **`data-testid` strings** — either edit the `SELECTORS` registry in
+   `selectors.ts` directly, **or** drop a `selectors.json` at the workspace
+   root to override individual roles without touching code:
+
+   ```bash
+   # Auto-discover testids on your own page via LLM:
+   npx tsx cli.ts discover https://your-app.example.com/some-page
+   # → writes selectors.json
+   ```
+
+   At runtime, every entry in `selectors.json` overlays the matching key in
+   the default `SELECTORS` map. Unknown keys are ignored, missing keys keep
+   their defaults.
+3. **Data-consistency checks** — drop a `qa-checks.json` at the workspace root
+   (or pass `--checks path/to/file.json` to `data-consistency.ts`) to
+   declaratively define which fields to cross-check across which pages.
+   Placeholders `{TARGET.bookingUrl}`, `{TARGET.profileUrl}`, and
+   `{TARGET.baseUrl}` are expanded at load time. See the bundled
+   [`qa-checks.json`](qa-checks.json) for the schema.
+4. **Prompt phrasing** — set `QA_TARGET_NAME` and `QA_TARGET_DESCRIPTION` so
+   the personas, agents, and analyzers describe your app (not cal.com) when
+   talking to the LLM.
+5. **Profile-URL shape** — by default the profile is the first path segment
+   (`/:user/:event` → `/:user`). If your app uses a different shape, override
+   `TARGET.profileFromBookingUrl` in `selectors.ts`.
+
+The example POM in [`tests/pages/BookingPage.ts`](tests/pages/BookingPage.ts)
+and the e2e suite in [`tests/booking-flow.spec.ts`](tests/booking-flow.spec.ts)
+are intentionally cal.com-shaped — they're reference scaffolding for you to
+fork when adapting to a different target.
 
 ---
 
 ## CI
 
-A GitHub Actions workflow runs the full test suite on every push and pull request:
+A GitHub Actions workflow runs the full pipeline on every push and pull request:
 
 ```yaml
 # .github/workflows/playwright.yml
-# Triggers: push/PR to main and develop
-# Steps: install deps → install browsers → run tests → upload report
+# Triggers: push/PR to main and develop, plus a nightly schedule
+# Steps: install deps → install browsers → typecheck → lint → format check
+#        → unit tests (vitest) → README drift check → playwright e2e → upload artifacts
 ```
 
-Test reports and traces are uploaded as artifacts under the `playwright-report` artifact name.
+Test reports and traces are uploaded as artifacts under the `playwright-report`
+and `test-results` artifact names.
 
 ---
 

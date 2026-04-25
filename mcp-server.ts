@@ -1,9 +1,17 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { groqChat, MODELS } from './ai-tools/groq-client';
-import { ensureDir } from './ai-tools/tool-utils';
-import { explorePage } from './ai-tools/generate-tests';
+import { groqChat, groqChatJSON, MODELS } from './ai-tools/groq-client';
+import {
+  ensureDir,
+  isHttpUrl,
+  isPathInsideWorkspace,
+  readWithTruncationWarning,
+  collectPomContextFromDir,
+  collectSuiteContext,
+} from './ai-tools/tool-utils';
+import { captureDomSnapshot, formatDomSnapshot } from './ai-tools/dom-snapshot';
+import { explorePage, buildGenerateTestsPrompt } from './ai-tools/generate-tests';
 import { chromium } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -55,45 +63,6 @@ Provide:
 );
 
 // ─── Tool 2: Coverage Advisor ─────────────────────────────────────────────
-const MAX_CONTENT_CHARS = 8000;
-
-function readCapped(filePath: string): string {
-  const content = fs.readFileSync(filePath, 'utf-8');
-  return content.length > MAX_CONTENT_CHARS
-    ? content.substring(0, MAX_CONTENT_CHARS) + '\n\n[...truncated — file exceeds 8000 chars]'
-    : content;
-}
-
-function collectMcpPomContext(testFilePath: string): string {
-  const pagesDir = path.join(path.dirname(testFilePath), 'pages');
-  if (!fs.existsSync(pagesDir)) return '';
-  const files = fs.readdirSync(pagesDir).filter(f => f.endsWith('.ts'));
-  if (files.length === 0) return '';
-  return files
-    .map(f => {
-      const content = readCapped(path.join(pagesDir, f));
-      return `// --- ${f} ---\n${content}`;
-    })
-    .join('\n\n');
-}
-
-function collectMcpSuiteContext(testFilePath: string): string {
-  const dir = path.dirname(testFilePath);
-  const targetBase = path.basename(testFilePath);
-  const otherSpecs = fs.readdirSync(dir).filter(f => f.endsWith('.spec.ts') && f !== targetBase);
-  if (otherSpecs.length === 0) return '';
-  return otherSpecs
-    .map(f => {
-      const content = fs.readFileSync(path.join(dir, f), 'utf-8');
-      const matches = [...content.matchAll(/test(?:\.only|\.skip)?\s*\(\s*['"`]([^'"`\n]+)['"`]/g)];
-      const names = matches.map(m => m[1]);
-      if (names.length === 0) return '';
-      return `${f}:\n${names.map(n => `  - "${n}"`).join('\n')}`;
-    })
-    .filter(Boolean)
-    .join('\n\n');
-}
-
 server.tool(
   'advise_coverage',
   'Reviews a Playwright test file, scores coverage out of 10, and writes the top 3 missing tests',
@@ -105,8 +74,7 @@ server.tool(
   async ({ test_file_path }) => {
     const resolvedPath = path.resolve(process.cwd(), test_file_path);
 
-    const workspaceRoot = process.cwd() + path.sep;
-    if (!resolvedPath.startsWith(workspaceRoot)) {
+    if (!isPathInsideWorkspace(resolvedPath)) {
       return {
         content: [{ type: 'text', text: 'Error: path outside workspace is not permitted' }],
       };
@@ -118,12 +86,12 @@ server.tool(
       };
     }
 
-    const testCode = readCapped(resolvedPath);
-    const pomContext = collectMcpPomContext(resolvedPath);
+    const testCode = readWithTruncationWarning(resolvedPath);
+    const pomContext = collectPomContextFromDir(path.join(path.dirname(resolvedPath), 'pages'));
     const pomSection = pomContext
       ? `\nPAGE OBJECT MODEL (available locators and methods):\n${pomContext}\n`
       : '';
-    const suiteContext = collectMcpSuiteContext(resolvedPath);
+    const suiteContext = collectSuiteContext(resolvedPath);
     const suiteSection = suiteContext
       ? `\nTESTS ALREADY COVERED IN OTHER FILES (do NOT recommend these again):\n${suiteContext}\n`
       : '';
@@ -185,7 +153,7 @@ server.tool(
     output_path: z.string().optional().describe('Where to save the generated test file (optional)'),
   },
   async ({ url, output_path }) => {
-    if (!url.startsWith('http')) {
+    if (!isHttpUrl(url)) {
       return { content: [{ type: 'text', text: 'Error: URL must start with http or https' }] };
     }
 
@@ -203,63 +171,14 @@ server.tool(
       };
     }
 
-    const parsedUrl = new URL(pageData.url);
-    const relativePath = parsedUrl.pathname;
-
-    const formLines =
-      pageData.formElements.length > 0
-        ? [
-            '',
-            'FORM ELEMENTS:',
-            ...pageData.formElements.map(f => {
-              if (f.type === 'label') {
-                const lf = f as { type: 'label'; text: string; forAttr: string | null };
-                return `- [label] "${lf.text}"${lf.forAttr ? ` for="${lf.forAttr}"` : ''}`;
-              }
-              const fi = f as {
-                type: string;
-                inputType: string | null;
-                placeholder: string | null;
-                ariaLabel: string | null;
-                testId: string | null;
-              };
-              return `- [${fi.type}]${fi.inputType ? ` type="${fi.inputType}"` : ''}${fi.placeholder ? ` placeholder="${fi.placeholder}"` : ''}${fi.ariaLabel ? ` aria-label="${fi.ariaLabel}"` : ''}${fi.testId ? ` data-testid="${fi.testId}"` : ''}`;
-            }),
-          ]
-        : [];
-
-    const lines = [
-      `Generate a Playwright TypeScript test file for: ${pageData.url}`,
-      `Title: ${pageData.title}`,
-      '',
-      'DATA-TESTID ELEMENTS:',
-      ...pageData.testIds.map(e => `- data-testid="${e.testId}" ${e.tag} "${e.text}"`),
-      '',
-      'BUTTONS:',
-      ...pageData.buttons.map(
-        b => `- "${b.text}"${b.testId ? ` [data-testid="${b.testId}"]` : ''}`
-      ),
-      '',
-      'HEADINGS:',
-      ...pageData.headings.map(h => `- ${h.tag}: "${h.text}"`),
-      ...formLines,
-      '',
-      'Rules:',
-      '- Use ONLY selectors listed above',
-      '- getByTestId() for data-testid elements',
-      '- getByRole("button", { name }) for buttons without data-testid',
-      '- No `any` types — use Page and Locator from @playwright/test',
-      `- Every test.describe must use beforeEach to call page.goto("${relativePath}")`,
-      '- 5+ tests: load, elements, click date, time slots, mobile',
-      '- Page Object Model pattern',
-      '- Return ONLY TypeScript, no markdown fences',
-    ];
+    const pomContext = collectPomContextFromDir(path.join(process.cwd(), 'tests', 'pages'));
+    const { system, user } = buildGenerateTestsPrompt(pageData, pomContext);
 
     const result = await groqChat({
       model: MODELS.text,
       messages: [
-        { role: 'system', content: 'Expert QA engineer. Return ONLY TypeScript, no markdown.' },
-        { role: 'user', content: lines.join('\n') },
+        { role: 'system', content: system },
+        { role: 'user', content: user },
       ],
       max_tokens: 3000,
     });
@@ -269,8 +188,7 @@ server.tool(
 
     if (output_path) {
       const resolvedPath = path.resolve(process.cwd(), output_path);
-      const workspaceRoot = process.cwd() + path.sep;
-      if (!resolvedPath.startsWith(workspaceRoot)) {
+      if (!isPathInsideWorkspace(resolvedPath)) {
         return {
           content: [{ type: 'text', text: 'Error: path outside workspace is not permitted' }],
         };
@@ -291,11 +209,15 @@ server.tool(
 // ─── Tool 4: Visual Regression ────────────────────────────────────────────
 server.tool(
   'visual_regression',
-  'Takes screenshots across desktop, tablet, and mobile viewports and analyzes each for UX issues using AI vision',
+  'Takes screenshots across desktop and mobile viewports and analyzes each for UX issues using AI vision',
   {
     url: z.string().describe('The URL to analyze visually'),
   },
   async ({ url }) => {
+    if (!isHttpUrl(url)) {
+      return { content: [{ type: 'text', text: 'Error: URL must start with http or https' }] };
+    }
+
     const viewports = [
       { name: 'desktop', width: 1280, height: 720, label: 'Desktop' },
       { name: 'mobile', width: 375, height: 812, label: 'Mobile' },
@@ -364,7 +286,7 @@ server.tool(
     url: z
       .string()
       .describe(
-        'The booking page URL (e.g. https://cal.com/user/event). A profile URL is derived automatically.'
+        'The booking page URL (e.g. https://example.com/user/event). A profile URL is derived automatically.'
       ),
     data_keys: z
       .array(z.string())
@@ -372,7 +294,7 @@ server.tool(
       .describe('Data points to check (default: host name, event duration, meeting platform)'),
   },
   async ({ url, data_keys }) => {
-    if (!url.startsWith('http')) {
+    if (!isHttpUrl(url)) {
       return { content: [{ type: 'text', text: 'Error: URL must start with http or https' }] };
     }
 
@@ -413,7 +335,7 @@ server.tool(
                 },
                 {
                   role: 'user',
-                  content: `Extract "${key}" from:\n${pageText}\n\nReturn the value or NOT_FOUND.`,
+                  content: `Extract ${JSON.stringify(key)} from:\n${pageText}\n\nReturn the value or NOT_FOUND.`,
                 },
               ],
             });
@@ -465,7 +387,7 @@ server.tool(
     url: z.string().describe('The URL to navigate to for live DOM context'),
   },
   async ({ broken_selector, url }) => {
-    if (!url.startsWith('http')) {
+    if (!isHttpUrl(url)) {
       return { content: [{ type: 'text', text: 'Error: URL must start with http or https' }] };
     }
 
@@ -477,64 +399,47 @@ server.tool(
       await page.goto(url, { timeout: 15000 });
       await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
-      const domContext = await page.evaluate(() => {
-        const testIds = Array.from(document.querySelectorAll('[data-testid]'))
-          .filter(el => (el as HTMLElement).offsetParent !== null)
-          .map(
-            el =>
-              `  testid="${el.getAttribute('data-testid')}" <${el.tagName.toLowerCase()}> "${((el as HTMLElement).innerText || '').trim().substring(0, 60)}"`
+      const domContext = formatDomSnapshot(await captureDomSnapshot(page));
+
+      const HealingSchema = z.object({
+        suggestions: z
+          .array(
+            z.object({
+              playwrightCode: z.string(),
+              description: z.string(),
+              confidence: z.enum(['high', 'medium', 'low']),
+            })
           )
-          .slice(0, 20);
-        const headings = Array.from(document.querySelectorAll('h1,h2,h3')).map(
-          el =>
-            `  <${el.tagName.toLowerCase()}> "${((el as HTMLElement).innerText || '').trim().substring(0, 60)}"`
-        );
-        const buttons = Array.from(document.querySelectorAll('button:not([disabled])'))
-          .filter(el => (el as HTMLElement).offsetParent !== null)
-          .map(el => {
-            const testId = el.getAttribute('data-testid');
-            const text = ((el as HTMLElement).innerText || '').trim().substring(0, 50);
-            return `  [button]${testId ? ` testid="${testId}"` : ''} text="${text}"`;
-          })
-          .filter(b => !b.endsWith('text=""'))
-          .slice(0, 15);
-        return [
-          'DATA-TESTID ELEMENTS:',
-          ...testIds,
-          '',
-          'HEADINGS:',
-          ...headings,
-          '',
-          'BUTTONS:',
-          ...buttons,
-        ].join('\n');
+          .default([]),
       });
 
-      const result = await groqChat({
-        model: MODELS.text,
-        messages: [
-          {
-            role: 'system',
-            content:
-              'Expert Playwright engineer. Suggest 5 replacement locators for a broken selector. Preference: getByTestId > getByRole > getByText > locator. Return ONLY valid JSON, no markdown.',
-          },
-          {
-            role: 'user',
-            content: `BROKEN LOCATOR: ${broken_selector}\n\nCURRENT DOM:\n${domContext}\n\nReturn: { "suggestions": [{ "playwrightCode": "...", "description": "...", "confidence": "high|medium|low" }] }`,
-          },
-        ],
-      });
-
-      let suggestions: { playwrightCode: string; description: string; confidence: string }[] = [];
+      let suggestions: z.infer<typeof HealingSchema>['suggestions'] = [];
       try {
-        const raw = result.choices[0].message.content!;
-        const match = raw.match(/\{[\s\S]*\}/);
-        const parsed = JSON.parse(match?.[0] ?? raw);
-        suggestions = parsed.suggestions ?? [];
-      } catch {
+        const parsed = await groqChatJSON(
+          {
+            model: MODELS.text,
+            messages: [
+              {
+                role: 'system',
+                content:
+                  'Expert Playwright engineer. Suggest 5 replacement locators for a broken selector. Preference: getByTestId > getByRole > getByText > locator. Return ONLY valid JSON, no markdown.',
+              },
+              {
+                role: 'user',
+                content: `BROKEN LOCATOR: ${broken_selector}\n\nCURRENT DOM:\n${domContext}\n\nReturn: { "suggestions": [{ "playwrightCode": "...", "description": "...", "confidence": "high|medium|low" }] }`,
+              },
+            ],
+          },
+          HealingSchema
+        );
+        suggestions = parsed.suggestions;
+      } catch (err) {
         return {
           content: [
-            { type: 'text', text: `AI suggestions (raw):\n${result.choices[0].message.content}` },
+            {
+              type: 'text',
+              text: `Could not parse AI suggestions: ${err instanceof Error ? err.message : String(err)}`,
+            },
           ],
         };
       }

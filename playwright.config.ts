@@ -36,4 +36,17 @@ export default defineConfig({
       use: { ...devices['Desktop Safari'] },
     },
   ],
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Optional: spin up a local Cal.com fork (or any web app under test) before
+  // the suite runs. Uncomment and adjust the `command` and `url` for your
+  // self-hosted setup. With this enabled, set BASE_URL=http://localhost:3000
+  // when invoking Playwright so `use.baseURL` above points at your dev server.
+  //
+  // webServer: {
+  //   command: 'npm run dev',
+  //   url: 'http://localhost:3000',
+  //   timeout: 120_000,
+  //   reuseExistingServer: !process.env.CI,
+  // },
 });

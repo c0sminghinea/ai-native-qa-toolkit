@@ -2,6 +2,7 @@
 
 import { spawnSync } from 'child_process';
 import * as path from 'path';
+import { TARGET } from './ai-tools/selectors';
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -18,6 +19,7 @@ const toolCommands: Record<string, string[]> = {
   consistency: ['npx', 'tsx', 'ai-tools/data-consistency.ts', ...extraArgs],
   cdp: ['npx', 'tsx', 'ai-tools/cdp-inspector.ts', ...extraArgs],
   heal: ['npx', 'tsx', 'ai-tools/locator-healer.ts', ...extraArgs],
+  discover: ['npx', 'tsx', 'ai-tools/discover-selectors.ts', ...extraArgs],
   mcp: ['npx', 'tsx', 'mcp-playwright-demo.ts', ...extraArgs],
   test: ['npx', 'playwright', 'test', ...extraArgs],
   report: ['npx', 'playwright', 'show-report'],
@@ -33,6 +35,7 @@ const descriptions: Record<string, string> = {
   consistency: 'Data consistency checker',
   cdp: 'CDP browser protocol inspector',
   heal: 'Heal broken locators with AI suggestions',
+  discover: 'Discover data-testid mappings on a target URL',
   mcp: 'Playwright MCP server demo',
   test: 'Run the Playwright test suite',
   report: 'Open the Playwright trace viewer',
@@ -46,12 +49,14 @@ if (!command || command === 'help' || command === '--help') {
     console.log(`  ${cmd.padEnd(14)} ${desc}`);
   });
   console.log('\nExamples:');
-  console.log('  npx tsx cli.ts generate https://cal.com/bailey/chat');
+  console.log(`  npx tsx cli.ts generate ${TARGET.bookingUrl}`);
   console.log('  npx tsx cli.ts analyze');
-  console.log('  npx tsx cli.ts visual https://cal.com/bailey/chat');
-  console.log('  npx tsx cli.ts agent "verify booking flow" https://cal.com/bailey/chat');
+  console.log(`  npx tsx cli.ts visual ${TARGET.bookingUrl}`);
+  console.log(`  npx tsx cli.ts agent "verify booking flow" ${TARGET.bookingUrl}`);
   console.log('  npx tsx cli.ts test');
   console.log('  npx tsx cli.ts report\n');
+  console.log(`Current target: ${TARGET.name} (${TARGET.bookingUrl})`);
+  console.log('Override via env vars: BASE_URL, BOOKING_PATH, QA_TARGET_NAME\n');
   process.exit(0);
 }
 

@@ -4,6 +4,9 @@
   "description": "AI-native QA toolkit for Playwright",
   "scripts": {
     "test": "playwright test",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "check:docs": "tsx scripts/check-readme.ts",
     "test:headed": "playwright test --headed",
     "test:debug": "playwright test --debug",
     "test:report": "playwright show-report",
@@ -63,7 +66,8 @@
     "lint-staged": "^16.4.0",
     "prettier": "^3.8.3",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
