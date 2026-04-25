@@ -1,5 +1,5 @@
 import { groqChat, MODELS } from './groq-client';
-import { saveReport, sleep } from './tool-utils';
+import { saveReport, DEFAULT_BASE_URL, DEFAULT_TARGET_URL } from './tool-utils';
 import { chromium, Browser } from '@playwright/test';
 
 interface PageCheck {
@@ -35,7 +35,7 @@ async function extractDataFromPage(
 
   try {
     await page.goto(url, { timeout: 15000 });
-    await sleep(2000);
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     const pageText = await page.evaluate(() => document.body.innerText);
 
@@ -170,7 +170,6 @@ async function runDataConsistencyCheck(
         }
         console.log(`   ${dataPoint.found ? '✅' : '❌'} ${pageCheck.name}: ${dataPoint.value || 'NOT FOUND'}`);
         extractedData.push(dataPoint);
-        await sleep(1000);
       }
 
       const analysis = await analyzeConsistency(check.key, extractedData);
@@ -259,21 +258,25 @@ This tool catches these issues automatically before they reach users.
 }
 
 // ─── Define what to check ────────────────────────────────────────────────
-// Using cal.com as the demo target — checking if event/host data
-// is consistent across the profile page, event page, and embed
-const TARGET = process.env.BASE_URL || 'https://cal.com';
+// Derive profile URL from DEFAULT_TARGET_URL so BASE_URL + BOOKING_PATH env
+// vars are respected instead of hardcoding /bailey paths.
+const { origin, pathname } = new URL(DEFAULT_TARGET_URL);
+const profileSegment = pathname.split('/').filter(Boolean)[0];
+const PROFILE_URL = profileSegment ? `${origin}/${profileSegment}` : DEFAULT_BASE_URL;
+const EVENT_URL = DEFAULT_TARGET_URL;
+
 const checksToRun = [
   {
     key: 'host name',
     pages: [
       {
         name: 'Profile Page',
-        url: `${TARGET}/bailey`,
+        url: PROFILE_URL,
         description: 'Main profile listing page'
       },
       {
         name: 'Event Page',
-        url: `${TARGET}/bailey/chat`,
+        url: EVENT_URL,
         description: 'Individual event booking page'
       }
     ]
@@ -283,12 +286,12 @@ const checksToRun = [
     pages: [
       {
         name: 'Profile Page',
-        url: `${TARGET}/bailey`,
+        url: PROFILE_URL,
         description: 'Duration shown on profile listing'
       },
       {
         name: 'Event Page',
-        url: `${TARGET}/bailey/chat`,
+        url: EVENT_URL,
         description: 'Duration shown on booking page'
       }
     ]
@@ -298,12 +301,12 @@ const checksToRun = [
     pages: [
       {
         name: 'Profile Page',
-        url: `${TARGET}/bailey`,
+        url: PROFILE_URL,
         description: 'Meeting platform shown on profile'
       },
       {
         name: 'Event Page',
-        url: `${TARGET}/bailey/chat`,
+        url: EVENT_URL,
         description: 'Meeting platform shown on booking page'
       }
     ]

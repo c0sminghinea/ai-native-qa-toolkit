@@ -1,5 +1,5 @@
 import { groqChat, MODELS } from './groq-client';
-import { ensureDir, isSafeSelector, parseAIJson, saveReport } from './tool-utils';
+import { ensureDir, isSafeSelector, parseAIJson, saveReport, DEFAULT_BASE_URL } from './tool-utils';
 import { chromium } from '@playwright/test';
 import * as path from 'path';
 
@@ -257,6 +257,6 @@ Screenshots saved to: ${screenshotsDir}
 
 // Run the agent
 const goal = process.argv[2] || 'Verify that a user can navigate from the profile page to the booking calendar and see available time slots';
-const startUrl = process.argv[3] || `${process.env.BASE_URL || 'https://cal.com'}/bailey`;
+const startUrl = process.argv[3] || `${DEFAULT_BASE_URL}/bailey`;
 
 runAgent(goal, startUrl).catch(console.error);

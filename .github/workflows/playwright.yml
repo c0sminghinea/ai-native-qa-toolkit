@@ -36,6 +36,9 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Lint
+        run: npx eslint . --ext .ts
+
       - name: Run tests
         run: npx playwright test
         env:

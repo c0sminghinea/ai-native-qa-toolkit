@@ -2,7 +2,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { groqChat, MODELS } from './ai-tools/groq-client';
-import { sleep, ensureDir } from './ai-tools/tool-utils';
+import { ensureDir } from './ai-tools/tool-utils';
+import { explorePage } from './ai-tools/generate-tests';
 import { chromium } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -50,6 +51,41 @@ Provide:
 );
 
 // ─── Tool 2: Coverage Advisor ─────────────────────────────────────────────
+const MAX_CONTENT_CHARS = 8000;
+
+function readCapped(filePath: string): string {
+  const content = fs.readFileSync(filePath, 'utf-8');
+  return content.length > MAX_CONTENT_CHARS
+    ? content.substring(0, MAX_CONTENT_CHARS) + '\n\n[...truncated — file exceeds 8000 chars]'
+    : content;
+}
+
+function collectMcpPomContext(testFilePath: string): string {
+  const pagesDir = path.join(path.dirname(testFilePath), 'pages');
+  if (!fs.existsSync(pagesDir)) return '';
+  const files = fs.readdirSync(pagesDir).filter(f => f.endsWith('.ts'));
+  if (files.length === 0) return '';
+  return files.map(f => {
+    const content = readCapped(path.join(pagesDir, f));
+    return `// --- ${f} ---\n${content}`;
+  }).join('\n\n');
+}
+
+function collectMcpSuiteContext(testFilePath: string): string {
+  const dir = path.dirname(testFilePath);
+  const targetBase = path.basename(testFilePath);
+  const otherSpecs = fs.readdirSync(dir)
+    .filter(f => f.endsWith('.spec.ts') && f !== targetBase);
+  if (otherSpecs.length === 0) return '';
+  return otherSpecs.map(f => {
+    const content = fs.readFileSync(path.join(dir, f), 'utf-8');
+    const matches = [...content.matchAll(/test(?:\.only|\.skip)?\s*\(\s*['"`]([^'"`\n]+)['"`]/g)];
+    const names = matches.map(m => m[1]);
+    if (names.length === 0) return '';
+    return `${f}:\n${names.map(n => `  - "${n}"`).join('\n')}`;
+  }).filter(Boolean).join('\n\n');
+}
+
 server.tool(
   'advise_coverage',
   'Reviews a Playwright test file, scores coverage out of 10, and writes the top 3 missing tests',
@@ -72,7 +108,15 @@ server.tool(
       };
     }
 
-    const testCode = fs.readFileSync(resolvedPath, 'utf-8');
+    const testCode = readCapped(resolvedPath);
+    const pomContext = collectMcpPomContext(resolvedPath);
+    const pomSection = pomContext
+      ? `\nPAGE OBJECT MODEL (available locators and methods):\n${pomContext}\n`
+      : '';
+    const suiteContext = collectMcpSuiteContext(resolvedPath);
+    const suiteSection = suiteContext
+      ? `\nTESTS ALREADY COVERED IN OTHER FILES (do NOT recommend these again):\n${suiteContext}\n`
+      : '';
 
     const result = await groqChat({
       model: MODELS.text,
@@ -84,7 +128,7 @@ server.tool(
         {
           role: 'user',
           content: `Review this Playwright test file and identify coverage gaps.
-
+${pomSection}${suiteSection}
 TEST FILE:
 ${testCode}
 
@@ -101,17 +145,18 @@ CRITICAL GAPS:
 TOP 3 TESTS TO ADD:
 1. Test name: [name]
    Why: [one sentence on why this matters]
-   Code: [the actual Playwright test code]
+   Code: [the actual Playwright test code using the POM locators above]
 
 2. Test name: [name]
    Why: [one sentence on why this matters]
-   Code: [the actual Playwright test code]
+   Code: [the actual Playwright test code using the POM locators above]
 
 3. Test name: [name]
    Why: [one sentence on why this matters]
-   Code: [the actual Playwright test code]`
+   Code: [the actual Playwright test code using the POM locators above]`
         }
-      ]
+      ],
+      max_tokens: 3000,
     });
 
     return {
@@ -119,42 +164,6 @@ TOP 3 TESTS TO ADD:
     };
   }
 );
-
-// ─── Helper: scrape interactive elements from a live page ─────────────────
-async function explorePage(url: string) {
-  const browser = await chromium.launch({ headless: true });
-  try {
-    const page = await (await browser.newContext()).newPage();
-    await page.goto(url, { timeout: 15000 });
-    await page.waitForTimeout(2000);
-
-    const data = await page.evaluate(() => {
-      const testIds = Array.from(document.querySelectorAll('[data-testid]'))
-        .filter(el => (el as HTMLElement).offsetParent !== null)
-        .map(el => ({
-          testId: el.getAttribute('data-testid'),
-          tag: el.tagName,
-          text: ((el as HTMLElement).innerText || '').trim().substring(0, 50),
-        }));
-
-      const buttons = Array.from(document.querySelectorAll('button:not([disabled])'))
-        .map(el => ({
-          text: ((el as HTMLElement).innerText || '').trim().substring(0, 50),
-          testId: el.getAttribute('data-testid'),
-        }))
-        .filter(b => b.text);
-
-      const headings = Array.from(document.querySelectorAll('h1,h2,h3'))
-        .map(el => ({ tag: el.tagName, text: ((el as HTMLElement).innerText || '').trim().substring(0, 50) }));
-
-      return { testIds, buttons, headings };
-    });
-
-    return { url: page.url(), title: await page.title(), ...data };
-  } finally {
-    await browser.close();
-  }
-}
 
 // ─── Tool 3: Generate Tests ───────────────────────────────────────────────
 server.tool(
@@ -178,6 +187,24 @@ server.tool(
       };
     }
 
+    const parsedUrl = new URL(pageData.url);
+    const relativePath = parsedUrl.pathname;
+
+    const formLines = pageData.formElements.length > 0
+      ? [
+          '',
+          'FORM ELEMENTS:',
+          ...pageData.formElements.map(f => {
+            if (f.type === 'label') {
+              const lf = f as { type: 'label'; text: string; forAttr: string | null };
+              return `- [label] "${lf.text}"${lf.forAttr ? ` for="${lf.forAttr}"` : ''}`;
+            }
+            const fi = f as { type: string; inputType: string | null; placeholder: string | null; ariaLabel: string | null; testId: string | null };
+            return `- [${fi.type}]${fi.inputType ? ` type="${fi.inputType}"` : ''}${fi.placeholder ? ` placeholder="${fi.placeholder}"` : ''}${fi.ariaLabel ? ` aria-label="${fi.ariaLabel}"` : ''}${fi.testId ? ` data-testid="${fi.testId}"` : ''}`;
+          }),
+        ]
+      : [];
+
     const lines = [
       `Generate a Playwright TypeScript test file for: ${pageData.url}`,
       `Title: ${pageData.title}`,
@@ -190,11 +217,14 @@ server.tool(
       '',
       'HEADINGS:',
       ...pageData.headings.map(h => `- ${h.tag}: "${h.text}"`),
+      ...formLines,
       '',
       'Rules:',
       '- Use ONLY selectors listed above',
       '- getByTestId() for data-testid elements',
-      '- getByRole("button", { name }) for buttons',
+      '- getByRole("button", { name }) for buttons without data-testid',
+      '- No `any` types — use Page and Locator from @playwright/test',
+      `- Every test.describe must use beforeEach to call page.goto("${relativePath}")`,
       '- 5+ tests: load, elements, click date, time slots, mobile',
       '- Page Object Model pattern',
       '- Return ONLY TypeScript, no markdown fences',
@@ -214,6 +244,10 @@ server.tool(
 
     if (output_path) {
       const resolvedPath = path.resolve(process.cwd(), output_path);
+      const workspaceRoot = process.cwd() + path.sep;
+      if (!resolvedPath.startsWith(workspaceRoot)) {
+        return { content: [{ type: 'text', text: 'Error: path outside workspace is not permitted' }] };
+      }
       fs.writeFileSync(resolvedPath, code);
       return {
         content: [{ type: 'text', text: `Tests generated and saved to ${resolvedPath}\n\n${code}` }],
@@ -239,41 +273,45 @@ server.tool(
 
     const analyses: string[] = [];
 
-    for (const vp of viewports) {
-      const browser = await chromium.launch({ headless: true });
-      const context = await browser.newContext({ viewport: { width: vp.width, height: vp.height } });
-      const page = await context.newPage();
-      await page.goto(url, { timeout: 15000 });
-      await page.waitForTimeout(2000);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      for (const vp of viewports) {
+        const context = await browser.newContext({ viewport: { width: vp.width, height: vp.height } });
+        const page = await context.newPage();
+        await page.goto(url, { timeout: 15000 });
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
-      const dir = path.join(process.cwd(), 'visual-regression');
-      ensureDir(dir);
-      const screenshotPath = path.join(dir, `mcp-${vp.name}.png`);
-      await page.screenshot({ path: screenshotPath, fullPage: true });
+        const dir = path.join(process.cwd(), 'visual-regression');
+        ensureDir(dir);
+        const screenshotPath = path.join(dir, `mcp-${vp.name}.png`);
+        // Viewport-only keeps the PNG well under the vision API's ~4 MB limit.
+        await page.screenshot({ path: screenshotPath, fullPage: false });
+        await context.close();
+
+        const imageData = fs.readFileSync(screenshotPath);
+        const base64Image = imageData.toString('base64');
+
+        const result = await groqChat({
+          model: MODELS.vision,
+          messages: [{
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `Analyze this ${vp.label} screenshot for UX issues. Focus on: layout problems, CTA visibility, conversion risks. Rate 1-10.`
+              },
+              {
+                type: 'image_url',
+                image_url: { url: `data:image/png;base64,${base64Image}` }
+              }
+            ]
+          }]
+        });
+
+        analyses.push(`## ${vp.label}\n${result.choices[0].message.content}`);
+      }
+    } finally {
       await browser.close();
-
-      const imageData = fs.readFileSync(screenshotPath);
-      const base64Image = imageData.toString('base64');
-
-      const result = await groqChat({
-        model: MODELS.vision,
-        messages: [{
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `Analyze this ${vp.label} screenshot for UX issues. Focus on: layout problems, CTA visibility, conversion risks. Rate 1-10.`
-            },
-            {
-              type: 'image_url',
-              image_url: { url: `data:image/png;base64,${base64Image}` }
-            }
-          ]
-        }]
-      });
-
-      analyses.push(`## ${vp.label}\n${result.choices[0].message.content}`);
-      await sleep(2000);
     }
 
     return {
@@ -318,7 +356,7 @@ server.tool(
           const page = await context.newPage();
           try {
             await page.goto(pg.url, { timeout: 15000 });
-            await sleep(2000);
+            await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
             const pageText = (await page.evaluate(() => document.body.innerText)).substring(0, 3000);
             const extraction = await groqChat({
               model: MODELS.text,
@@ -369,7 +407,7 @@ server.tool(
       const context = await browser.newContext();
       const page = await context.newPage();
       await page.goto(url, { timeout: 15000 });
-      await sleep(2000);
+      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
       const domContext = await page.evaluate(() => {
         const testIds = Array.from(document.querySelectorAll('[data-testid]'))

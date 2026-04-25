@@ -552,7 +552,7 @@ This toolkit runs entirely on free tier APIs and open-source models:
 | Vision Analysis | Groq (llama-4-scout-17b) | Free tier |
 | Browser Automation | Playwright | Open source |
 | MCP Orchestration | @modelcontextprotocol/sdk | Open source |
-| Test Runner | Vitest + Playwright | Open source |
+| Test Runner | Playwright | Open source |
 | Playwright MCP | @playwright/mcp | Open source |
 
 The AI-first approach means zero onboarding time on new codebases — the

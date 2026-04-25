@@ -1,12 +1,40 @@
 import { groqChat, MODELS } from './ai-tools/groq-client';
+import { sleep } from './ai-tools/tool-utils';
 import * as fs from 'fs';
 import * as path from 'path';
 import { spawn } from 'child_process';
 
+interface JsonRpcRequest {
+  jsonrpc: '2.0';
+  id: number;
+  method: string;
+  params?: unknown;
+}
+
+interface JsonRpcResponse {
+  jsonrpc: '2.0';
+  id: number;
+  result?: unknown;
+  error?: { code: number; message: string };
+}
+
+interface McpTool {
+  name: string;
+  description?: string;
+}
+
+interface McpToolsResult {
+  tools: McpTool[];
+}
+
+interface McpContentResult {
+  content: Array<{ type: string; text: string }>;
+}
+
 async function sendMCPMessage(
   process: ReturnType<typeof spawn>,
-  message: object
-): Promise<object> {
+  message: JsonRpcRequest
+): Promise<JsonRpcResponse> {
   return new Promise((resolve, reject) => {
     const messageStr = JSON.stringify(message) + '\n';
     let response = '';
@@ -16,8 +44,8 @@ async function sendMCPMessage(
       try {
         const lines = response.split('\n').filter(l => l.trim());
         for (const line of lines) {
-          const parsed = JSON.parse(line);
-          if (parsed.id === (message as any).id) {
+          const parsed: JsonRpcResponse = JSON.parse(line);
+          if (parsed.id === message.id) {
             process.stdout?.removeListener('data', onData);
             resolve(parsed);
             return;
@@ -49,7 +77,7 @@ async function runPlaywrightMCPDemo() {
     if (msg) console.log(`   [MCP Server] ${msg}`);
   });
 
-  await new Promise(r => setTimeout(r, 2000));
+  await sleep(2000);
 
   try {
     // Initialize the MCP connection
@@ -71,11 +99,11 @@ async function runPlaywrightMCPDemo() {
       id: 2,
       method: 'tools/list',
       params: {}
-    }) as any;
+    });
 
-    const tools = toolsResponse.result?.tools || [];
+    const tools = (toolsResponse.result as McpToolsResult)?.tools ?? [];
     console.log(`📦 Playwright MCP exposes ${tools.length} browser control tools:`);
-    tools.slice(0, 8).forEach((t: any) => {
+    tools.slice(0, 8).forEach((t: McpTool) => {
       console.log(`   - ${t.name}: ${t.description?.substring(0, 60)}...`);
     });
     console.log();
@@ -103,9 +131,9 @@ async function runPlaywrightMCPDemo() {
         name: 'browser_snapshot',
         arguments: {}
       }
-    }) as any;
+    });
 
-    const snapshot = snapshotResponse.result?.content?.[0]?.text || '';
+    const snapshot = (snapshotResponse.result as McpContentResult)?.content?.[0]?.text ?? '';
     console.log(`   ✅ Snapshot captured (${snapshot.length} chars)\n`);
 
     // Ask AI to analyze what it sees and decide next action
@@ -149,7 +177,7 @@ a browser through the Model Context Protocol — the same protocol Claude Code
 uses to interact with browsers in agentic workflows.
 
 ## MCP Tools Available
-${tools.map((t: any) => `- \`${t.name}\`: ${t.description}`).join('\n')}
+${tools.map((t: McpTool) => `- \`${t.name}\`: ${t.description ?? ''}`).join('\n')}
 
 ## Session Log
 

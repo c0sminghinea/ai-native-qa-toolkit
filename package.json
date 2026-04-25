@@ -29,8 +29,8 @@
     "test:webkit": "playwright test --project=webkit",
     "clean": "rm -rf dist"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["playwright", "ai", "qa", "testing", "mcp", "llm"],
+  "author": "X",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {

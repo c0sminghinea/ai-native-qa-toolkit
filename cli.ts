@@ -69,6 +69,6 @@ try {
     shell: false,
   });
   if (result.status !== 0) process.exit(result.status ?? 1);
-} catch (err) {
+} catch {
   process.exit(1);
 }

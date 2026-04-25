@@ -1,5 +1,5 @@
 import { groqChat, MODELS } from './groq-client';
-import { ensureDir, saveReport, handleToolError, sleep, DEFAULT_TARGET_URL } from './tool-utils';
+import { ensureDir, saveReport, handleToolError, DEFAULT_TARGET_URL } from './tool-utils';
 import { chromium, type Browser } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -11,14 +11,15 @@ async function captureScreenshot(browser: Browser, url: string, name: string, vi
     await page.goto(url, { timeout: 15000 }).catch(() => {
       throw new Error(`Could not load URL: ${url} — check it is publicly accessible`);
     });
-
-    await sleep(2000);
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     const dir = path.join(process.cwd(), 'visual-regression');
     ensureDir(dir);
 
     const screenshotPath = path.join(dir, `${name}.png`);
-    await page.screenshot({ path: screenshotPath, fullPage: true });
+    // Viewport-only keeps the PNG well under the vision API's ~4 MB limit.
+    // Full-page screenshots of tall pages can easily exceed it and cause hard errors.
+    await page.screenshot({ path: screenshotPath, fullPage: false });
 
     return screenshotPath;
 
@@ -136,8 +137,6 @@ async function compareViewports(url: string) {
         analysis,
         screenshot: screenshotPath
       });
-
-      await sleep(2000);
     }
     } finally {
       await browser.close();

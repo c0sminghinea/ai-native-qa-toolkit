@@ -1,5 +1,5 @@
 import { groqChat, MODELS } from './groq-client';
-import { saveReport, sleep, DEFAULT_TARGET_URL } from './tool-utils';
+import { saveReport, DEFAULT_TARGET_URL } from './tool-utils';
 import { chromium } from '@playwright/test';
 
 interface NetworkRequest {
@@ -113,22 +113,24 @@ async function inspectWithCDP(url: string) {
 
   // Navigate and interact with the page
   console.log('📡 Opening CDP session and navigating...\n');
-  await page.goto(url, { timeout: 15000 });
-  await sleep(3000);
-
-  // Simulate a user interaction to capture dynamic requests
-  console.log('👆 Simulating user interaction...\n');
   try {
-    const dateButton = page.getByRole('button').filter({
-      hasNot: page.locator('[disabled]')
-    }).first();
-    await dateButton.click({ timeout: 3000 });
-    await sleep(2000);
-  } catch {
-    console.log('   No interactive elements found — static analysis only\n');
-  }
+    await page.goto(url, { timeout: 15000 });
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
-  await browser.close();
+    // Simulate a user interaction to capture dynamic requests
+    console.log('👆 Simulating user interaction...\n');
+    try {
+      const dateButton = page.getByRole('button').filter({
+        hasNot: page.locator('[disabled]')
+      }).first();
+      await dateButton.click({ timeout: 3000 });
+      await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    } catch {
+      console.log('   No interactive elements found — static analysis only\n');
+    }
+  } finally {
+    await browser.close();
+  }
 
   // Analyze findings
   console.log(`\n🔀 Request Interception Results:`);
@@ -155,6 +157,7 @@ async function inspectWithCDP(url: string) {
   console.log(`   Total network requests captured: ${networkRequests.length}`);
   console.log(`   API/tRPC calls: ${apiRequests.length}`);
   console.log(`   Failed requests (4xx/5xx): ${failedRequests.length}`);
+  console.log(`   Slow requests (>1s): ${slowRequests.length}`);
   console.log(`   Console messages: ${consoleMessages.length}`);
   console.log(`   JavaScript errors: ${errors.length}\n`);
 
@@ -192,6 +195,7 @@ NETWORK SUMMARY:
 - Total requests: ${networkRequests.length}
 - API/tRPC calls: ${apiRequests.length}
 - Failed requests: ${failedRequests.length}
+- Slow requests (>1s): ${slowRequests.length}
 - Resource types: ${[...new Set(networkRequests.map(r => r.resourceType))].join(', ')}
 
 API CALLS DETECTED:
@@ -232,6 +236,7 @@ Provide:
 - Total requests captured: ${networkRequests.length}
 - API/tRPC calls: ${apiRequests.length}
 - Failed requests: ${failedRequests.length}
+- Slow requests (>1s): ${slowRequests.length}
 - JavaScript errors: ${errors.length}
 
 ## API Calls Detected

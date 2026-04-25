@@ -1,5 +1,5 @@
 import { groqChat, MODELS } from './groq-client';
-import { handleToolError, isSafeSelector, saveReport, parseAIJson, sleep, DEFAULT_TARGET_URL } from './tool-utils';
+import { handleToolError, isSafeSelector, saveReport, parseAIJson, DEFAULT_TARGET_URL } from './tool-utils';
 import { chromium, type Page, type Locator } from '@playwright/test';
 import * as fs from 'fs';
 
@@ -173,7 +173,7 @@ async function healLocator(brokenSelector: string, url: string): Promise<void> {
     await page.goto(url, { timeout: 15000 }).catch(() => {
       throw new Error(`Could not load URL: ${url} — check it is publicly accessible`);
     });
-    await sleep(2000);
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     console.log('🗂️  Extracting DOM context...');
     const domContext = await extractDomContext(page);

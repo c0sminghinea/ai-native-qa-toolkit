@@ -1,5 +1,5 @@
 import { groqChat, MODELS } from './groq-client';
-import { ensureDir, parseAIJson, saveReport, sleep, DEFAULT_TARGET_URL } from './tool-utils';
+import { ensureDir, parseAIJson, saveReport, DEFAULT_TARGET_URL } from './tool-utils';
 import { chromium } from '@playwright/test';
 import * as path from 'path';
 
@@ -75,7 +75,7 @@ Make personas diverse and realistic. Include cases like:
   return parseAIJson<Persona[]>(result.choices[0].message.content!, '[');
 }
 
-async function testPersona(persona: Persona, index: number): Promise<{
+async function testPersona(persona: Persona, index: number, browser: import('@playwright/test').Browser): Promise<{
   persona: Persona;
   passed: boolean;
   findings: string[];
@@ -86,8 +86,6 @@ async function testPersona(persona: Persona, index: number): Promise<{
   console.log(`   Scenario: ${persona.scenario}`);
   console.log(`   Edge Case: ${persona.edgeCase}`);
   console.log(`   Risk: ${persona.expectedRisk.toUpperCase()}`);
-
-  const browser = await chromium.launch({ headless: true });
 
   const safeTimezone = safeTimezoneId(persona.timezone);
 
@@ -151,7 +149,6 @@ async function testPersona(persona: Persona, index: number): Promise<{
 
     // Click a date and check time slots
     await dateButton.click({ timeout: 3000 }).catch(() => null);
-    await sleep(1000);
 
     const timeSlotsVisible = await page.getByTestId('time').first().isVisible({ timeout: 5000 }).catch(() => false);
     if (timeSlotsVisible) {
@@ -215,7 +212,7 @@ async function testPersona(persona: Persona, index: number): Promise<{
     passed = false;
     await page.screenshot({ path: screenshotPath }).catch(() => null);
   } finally {
-    await browser.close();
+    await context.close();
   }
 
   const status = passed ? '✅ PASSED' : '❌ FAILED';
@@ -310,10 +307,14 @@ async function runPersonaEngine() {
   });
 
   console.log('\n🚀 Running persona tests (3 concurrent)...');
-  const tasks = personas.map((_p, i) => () => testPersona(personas[i], i));
-  const results = await runWithConcurrency(tasks, 3);
-
-  await generateReport(results);
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const tasks = personas.map((_p, i) => () => testPersona(personas[i], i, browser));
+    const results = await runWithConcurrency(tasks, 3);
+    await generateReport(results);
+  } finally {
+    await browser.close();
+  }
 }
 
 runPersonaEngine().catch(console.error);
