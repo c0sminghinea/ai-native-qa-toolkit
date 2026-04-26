@@ -36,16 +36,18 @@ test.describe('Accessibility basics', () => {
 
   test('every <img> has an alt attribute', async ({ page }, testInfo) => {
     await page.waitForLoadState('networkidle').catch(() => {});
-    const imgs = page.locator('img');
-    const count = await imgs.count();
-    if (count === 0) test.skip(true, 'no images on this page');
-
-    const missing: string[] = [];
-    for (let i = 0; i < count; i++) {
-      const img = imgs.nth(i);
-      const alt = await img.getAttribute('alt');
-      if (alt === null) missing.push((await img.getAttribute('src')) ?? '<no src>');
-    }
+    // Single evaluate() call instead of per-element round-trips to avoid timeouts on
+    // pages with many images (e.g. 88+ images × 30 ms/call > 30 s timeout).
+    const { total, missing } = await page.evaluate(() => {
+      const imgs = Array.from(document.querySelectorAll('img'));
+      return {
+        total: imgs.length,
+        missing: imgs
+          .filter(img => img.getAttribute('alt') === null)
+          .map(img => img.src || '<no src>'),
+      };
+    });
+    if (total === 0) test.skip(true, 'no images on this page');
     softExpect(
       missing.length === 0,
       `${missing.length} image(s) missing alt: ${missing.slice(0, 3).join(', ')}${missing.length > 3 ? '…' : ''}`,
@@ -54,19 +56,26 @@ test.describe('Accessibility basics', () => {
   });
 
   test('all visible <button>s have an accessible name', async ({ page }, testInfo) => {
-    const buttons = page.locator('button:visible');
-    const count = await buttons.count();
+    const count = await page.locator('button:visible').count();
     if (count === 0) test.skip(true, 'no visible buttons');
 
-    const nameless: number[] = [];
-    for (let i = 0; i < count; i++) {
-      const btn = buttons.nth(i);
-      const aria = (await btn.getAttribute('aria-label')) ?? '';
-      const label = (await btn.getAttribute('aria-labelledby')) ?? '';
-      const text = (await btn.innerText()).trim();
-      const title = (await btn.getAttribute('title')) ?? '';
-      if (!aria && !label && !text && !title) nameless.push(i);
-    }
+    // Single evaluate() call — avoids N Playwright round-trips for pages with many buttons.
+    const nameless = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('button'))
+        .filter(btn => {
+          const r = btn.getBoundingClientRect();
+          const s = window.getComputedStyle(btn);
+          return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none';
+        })
+        .reduce<number[]>((acc, btn, i) => {
+          const aria = btn.getAttribute('aria-label') ?? '';
+          const label = btn.getAttribute('aria-labelledby') ?? '';
+          const text = (btn.textContent ?? '').trim();
+          const title = btn.getAttribute('title') ?? '';
+          if (!aria && !label && !text && !title) acc.push(i);
+          return acc;
+        }, [])
+    );
     softExpect(
       nameless.length === 0,
       `${nameless.length} button(s) without accessible name (indices: ${nameless.slice(0, 5).join(',')})`,

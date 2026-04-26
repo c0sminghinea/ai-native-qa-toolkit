@@ -36,6 +36,7 @@ updates:
           - 'prettier'
           - 'typescript'
           - 'vitest'
+          - '@vitest/*'
           - 'tsx'
           - 'husky'
           - 'lint-staged'
