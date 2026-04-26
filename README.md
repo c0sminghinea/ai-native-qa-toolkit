@@ -50,7 +50,7 @@ flowchart TB
   Tools --> PROVIDER
   PROVIDER --> GROQ
   GROQ --> LLM[("Groq API<br/>llama-3.3 / llama-4-scout")]
-  Tools -.writes.-> REPORTS[("*-report.md<br/>+ runs/<ts>.json")]
+  Tools -.writes.-> REPORTS[("runs/reports/*.md<br/>+ runs/<ts>.json")]
   Tools --> TELEMETRY
   TELEMETRY -.writes.-> REPORTS
 
@@ -81,21 +81,31 @@ qa-playwright/
     tool-utils.ts           # Shared utilities: CLI flags, logger, URL/path/selector guards, report writer
   scripts/
     check-readme.ts         # Verifies every README command/file reference still resolves
+    check-secrets.ts        # Pre-commit + CI credential scanner (Groq/OpenAI/AWS/etc.)
   tests-unit/
     tool-utils.test.ts      # Vitest unit tests for shared helpers
   docs/
     cal-com-qa-audit.md     # Full QA audit of cal.com codebase
   tests/
-    pages/
-      BookingPage.ts        # Page Object Model for cal.com booking page
-    booking-flow.spec.ts    # Main E2E test suite (cross-browser)
-    ai-generated.spec.ts    # Output of generate-tests tool
+    toolkit/
+      cli-smoke.spec.ts     # Validates the toolkit's own CLI surface (offline, no API keys)
+    examples/
+      generic/              # Drop-in specs for any site (homepage smoke, a11y basics)
+        homepage.spec.ts
+        accessibility.spec.ts
+      cal-com/              # Bundled live-target example (re-target via env vars)
+        booking-flow.spec.ts
+        profile-page.spec.ts
+        pages/BookingPage.ts # POM that reads from SELECTORS — overridable via selectors.json
+    ai-generated.spec.ts    # Quarantined output of generate-tests; runs only in ai-quarantine project
   visual-regression/        # Screenshots from visual regression runs
   persona-screenshots/      # Screenshots from persona engine runs
   agent-screenshots/        # Screenshots from autonomous agent runs
-  # Generated reports (*-report.md) and the .cache/ directory are gitignored
+  # Generated reports (runs/reports/*.md) and the .cache/ directory are gitignored
   .env.example                 # Environment variable template
-  .github/workflows/playwright.yml  # CI — typecheck, lint, format, unit tests, drift check, e2e
+  .github/workflows/playwright.yml  # CI — secret-scan job + typecheck, lint, format, unit tests, drift check, e2e
+  .github/dependabot.yml            # Weekly grouped dependency updates
+  LICENSE                           # ISC license
   eslint.config.mjs            # ESLint flat config with TypeScript rules
   vitest.config.ts             # Vitest config — unit tests live in tests-unit/
   mcp-server.ts                # MCP server exposing all tools to LLM clients
@@ -134,7 +144,7 @@ npm run test:webkit
 npm run test:ai-generated
 
 # Specific file
-npx playwright test tests/booking-flow.spec.ts
+npx playwright test tests/examples/cal-com/booking-flow.spec.ts
 
 # Headed mode (watch the browser)
 npx playwright test --headed
@@ -210,7 +220,7 @@ Give it any URL — it writes a complete Playwright test file automatically.
 npx tsx ai-tools/generate-tests.ts https://cal.com/bailey/chat
 ```
 
-Output: `tests/ai-generated.spec.ts`
+Output: `tests/ai-generated.spec.ts` (quarantined — runs only via `npm run test:ai-generated`)
 
 ---
 
@@ -250,10 +260,10 @@ Reviews a test file, scores it out of 10, and writes the top 3 missing tests.
 npx tsx ai-tools/coverage-advisor.ts
 
 # Analyse any test file
-npx tsx ai-tools/coverage-advisor.ts tests/ai-generated.spec.ts
+npx tsx ai-tools/coverage-advisor.ts tests/examples/cal-com/booking-flow.spec.ts
 ```
 
-Output: printed to terminal + saved to `coverage-report.md`
+Output: printed to terminal + saved to `runs/reports/coverage-<spec>-report.md`
 
 ---
 
@@ -278,7 +288,7 @@ npx tsx ai-tools/browser-agent.ts "Verify a user can select a time slot" https:/
 3. Executes the action (click, navigate, fill, scroll)
 4. Self-corrects if the action fails using fallback strategies
 5. Repeats until goal is achieved or max steps reached
-6. Saves screenshots at each step + final report to `agent-report.md`
+6. Saves screenshots at each step + final report to `runs/reports/agent-report.md`
 
 **Real finding from a test run:**
 > The agent successfully navigated from `cal.com/bailey` to the booking
@@ -323,7 +333,7 @@ The engine distinguishes between **technical failures** (broken functionality)
 and **UX friction points** (conversion risks and usability issues) — giving
 both engineering and product teams actionable output.
 
-Output: `persona-report.md` + screenshots in `persona-screenshots/`
+Output: `runs/reports/persona-report.md` + screenshots in `persona-screenshots/`
 
 ---
 
@@ -349,7 +359,7 @@ npx tsx ai-tools/visual-regression.ts https://cal.com/bailey/chat
 | Tablet 768×1024 | 8/10 | "Book/Confirm" button not visible — user doesn't know how to proceed |
 | Mobile 375×812 | 7/10 | Time slots only visible after scrolling + timezone selector cut off |
 
-Output: `visual-regression-report.md` + screenshots in `visual-regression/`
+Output: `runs/reports/visual-regression-report.md` + screenshots in `visual-regression/`
 
 ---
 
@@ -385,7 +395,7 @@ In a C2C platform, data inconsistency between pages is a trust and conversion is
 - Availability on profile ≠ availability in calendar → double bookings, support tickets
 - Rating on listing ≠ rating on profile → erodes trust in the platform
 
-Output: `data-consistency-report.md`
+Output: `runs/reports/data-consistency-report.md`
 
 ---
 
@@ -420,7 +430,7 @@ npx tsx ai-tools/cdp-inspector.ts https://cal.com/bailey/chat
 > API responses without touching application code. This is how you test edge cases
 > like "what happens when the slots API returns empty?" in a real browser context.
 
-Output: `cdp-report.md`
+Output: `runs/reports/cdp-report.md`
 
 ---
 
@@ -474,7 +484,7 @@ trial-and-erroring. The healer automates this in seconds — it snapshots the
 live DOM, reasons about the element's semantic role, and verifies the candidate
 works before reporting it.
 
-Output: `locator-healer-report.md`
+Output: `runs/reports/locator-healer-report.md`
 
 ---
 
@@ -554,7 +564,7 @@ Playwright as an MCP server*. The LLM reasons about the accessibility tree
 and controls the browser dynamically — the same architecture Holidog likely
 uses with their internal AI-based QA tooling.
 
-Output: `playwright-mcp-report.md`
+Output: `runs/reports/playwright-mcp-report.md`
 
 ---
 
@@ -657,8 +667,8 @@ example, but everything cal.com-specific lives in **one** module:
    (`/:user/:event` → `/:user`). If your app uses a different shape, override
    `TARGET.profileFromBookingUrl` in `selectors.ts`.
 
-The example POM in [`tests/pages/BookingPage.ts`](tests/pages/BookingPage.ts)
-and the e2e suite in [`tests/booking-flow.spec.ts`](tests/booking-flow.spec.ts)
+The example POM in [`tests/examples/cal-com/pages/BookingPage.ts`](tests/examples/cal-com/pages/BookingPage.ts)
+and the e2e suite in [`tests/examples/cal-com/booking-flow.spec.ts`](tests/examples/cal-com/booking-flow.spec.ts)
 are intentionally cal.com-shaped — they're reference scaffolding for you to
 fork when adapting to a different target.
 
@@ -671,9 +681,22 @@ A GitHub Actions workflow runs the full pipeline on every push and pull request:
 ```yaml
 # .github/workflows/playwright.yml
 # Triggers: push/PR to main and develop, plus a nightly schedule
-# Steps: install deps → install browsers → typecheck → lint → format check
-#        → unit tests (vitest) → README drift check → playwright e2e → upload artifacts
+# Jobs:
+#   secret-scan -> gitleaks (full-history credential scan)
+#   test        -> typecheck → lint → format → secret regex → unit tests
+#                  → README drift → playwright e2e → upload artifacts
 ```
+
+**Required secrets:**
+- `GROQ_API_KEY` — needed for any e2e step that exercises an AI tool. Add it
+  under repo Settings → Secrets and variables → Actions. Tests that don't
+  hit the LLM run cleanly even when this is empty.
+
+**Repo hygiene:**
+- [.github/dependabot.yml](.github/dependabot.yml) — weekly grouped npm +
+  GitHub Actions update PRs.
+- [scripts/check-secrets.ts](scripts/check-secrets.ts) — fast pre-commit and
+  CI scanner for known credential patterns. Run locally via `npm run check:secrets`.
 
 Test reports and traces are uploaded as artifacts under the `playwright-report`
 and `test-results` artifact names.
@@ -767,3 +790,9 @@ focuses on judgment, verification, and strategy.
 
 A full QA audit of the cal.com codebase is available in [`docs/cal-com-qa-audit.md`](docs/cal-com-qa-audit.md) —
 demonstrating autonomous codebase exploration, risk analysis, and test strategy proposal.
+
+---
+
+## License
+
+ISC — see [LICENSE](LICENSE).

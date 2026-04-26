@@ -149,8 +149,11 @@ Limit topTestsToAdd to 3 entries.`,
     ].join('\n');
 
     const baseName = path.basename(testFile, '.spec.ts').replace(/[^a-z0-9-]/gi, '-');
-    const reportPath = `coverage-${baseName}-report.md`;
-    saveReport(reportPath, reportBody, flags.quiet || flags.json);
+    const reportPath = saveReport(
+      `coverage-${baseName}-report.md`,
+      reportBody,
+      flags.quiet || flags.json
+    );
 
     const failed = advice.score <= 5;
     if (flags.json) {
@@ -175,7 +178,7 @@ if (require.main === module) {
     `
 Usage: npx tsx ai-tools/coverage-advisor.ts [test-file] [--json] [--quiet] [--help]
 
-Reviews a Playwright spec file and writes coverage-<name>-report.md.
+Reviews a Playwright spec file and writes runs/reports/coverage-<name>-report.md.
 Exits with code 1 if the AI score is 5/10 or below.
 `
   );

@@ -15,7 +15,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks needs full history
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   test:
+    needs: secret-scan
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -58,8 +71,19 @@ jobs:
       - name: Format check
         run: npx prettier --check .
 
+      - name: Repo-wide secret scan (regex)
+        run: npm run check:secrets
+
       - name: Unit tests (vitest)
-        run: npm run test:unit
+        run: npm run test:unit:coverage
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-coverage
+          path: runs/coverage/
+          retention-days: 14
 
       - name: README drift check
         run: npm run check:docs
@@ -69,6 +93,9 @@ jobs:
         env:
           # Set BASE_URL as a GitHub Actions variable (not secret) to override target
           BASE_URL: ${{ vars.BASE_URL || 'https://cal.com' }}
+          # Required by any AI tool exercised during e2e. Tests that don't hit
+          # the LLM still run cleanly when this is empty (lazy client check).
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           CI: true
           GROQ_CACHE: '1'
 

@@ -15,17 +15,32 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { spawnSync } from 'child_process';
 
-/** Reads every .ts file from tests/pages/ so the AI can reuse existing POMs. */
+/**
+ * Reads every POM .ts file the toolkit ships with, so the AI can reuse
+ * existing page objects when generating new specs. Walks tests/examples/<app>/pages/
+ * (current layout) and falls back to tests/pages/ for legacy projects.
+ */
 function collectExistingPom(): string {
-  const pagesDir = path.join(process.cwd(), 'tests', 'pages');
-  if (!fs.existsSync(pagesDir)) return '';
-  const files = fs.readdirSync(pagesDir).filter(f => f.endsWith('.ts'));
-  if (files.length === 0) return '';
-  return files
-    .map(f => {
-      const content = fs.readFileSync(path.join(pagesDir, f), 'utf-8');
-      return `// --- ${f} ---\n${content}`;
-    })
+  const candidates: string[] = [];
+  const examplesRoot = path.join(process.cwd(), 'tests', 'examples');
+  if (fs.existsSync(examplesRoot)) {
+    for (const app of fs.readdirSync(examplesRoot)) {
+      const pagesDir = path.join(examplesRoot, app, 'pages');
+      if (!fs.existsSync(pagesDir)) continue;
+      for (const f of fs.readdirSync(pagesDir).filter(f => f.endsWith('.ts'))) {
+        candidates.push(path.join(pagesDir, f));
+      }
+    }
+  }
+  const legacyDir = path.join(process.cwd(), 'tests', 'pages');
+  if (fs.existsSync(legacyDir)) {
+    for (const f of fs.readdirSync(legacyDir).filter(f => f.endsWith('.ts'))) {
+      candidates.push(path.join(legacyDir, f));
+    }
+  }
+  if (candidates.length === 0) return '';
+  return candidates
+    .map(p => `// --- ${path.relative(process.cwd(), p)} ---\n${fs.readFileSync(p, 'utf-8')}`)
     .join('\n\n');
 }
 

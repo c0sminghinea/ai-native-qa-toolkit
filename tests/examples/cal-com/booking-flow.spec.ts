@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { BookingPage, DEFAULT_HOST_NAME as HOST_NAME } from './pages/BookingPage';
 
-test.describe('Cal.com Booking Flow', () => {
+// Example suite — exercises the booking flow of the bundled cal.com demo.
+// Move/rewrite under tests/examples/<your-app>/ when re-pointing the toolkit.
+test.describe('Example: booking flow', () => {
   let bookingPage: BookingPage;
 
   test.beforeEach(async ({ page }) => {
@@ -69,5 +71,39 @@ test.describe('Cal.com Booking Flow', () => {
       return;
     }
     await expect(bookingPage.validationError).toBeVisible({ timeout: 3000 });
+  });
+
+  test('previous month button never goes before the current month', async () => {
+    // Most schedulers (cal.com included) disable past navigation. Verify either
+    // the button is disabled or pressing it doesn't change the visible month.
+    const initialMonth = await bookingPage.monthLabel.textContent();
+    const isDisabled = await bookingPage.prevMonthButton.isDisabled().catch(() => false);
+    if (isDisabled) {
+      // Disabled is the canonical correct UX.
+      expect(isDisabled).toBe(true);
+      return;
+    }
+    await bookingPage.prevMonthButton.click();
+    // Allow a beat for any state transition.
+    await bookingPage.page.waitForTimeout(200);
+    const after = await bookingPage.monthLabel.textContent();
+    expect(after, 'past navigation should not advance backwards').toBe(initialMonth);
+  });
+
+  test('navigating month then back returns to original label', async () => {
+    const initialMonth = await bookingPage.monthLabel.textContent();
+    await bookingPage.nextMonthButton.click();
+    await expect(bookingPage.monthLabel).not.toHaveText(initialMonth!);
+    await bookingPage.prevMonthButton.click();
+    await expect(bookingPage.monthLabel).toHaveText(initialMonth!);
+  });
+
+  test('booker URL is shareable — direct navigation matches initial render', async ({ page }) => {
+    // Reload should produce the same primary content. Catches state-only routes.
+    const titleBefore = await bookingPage.eventTitle.textContent();
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(bookingPage.eventTitle).toBeVisible();
+    const titleAfter = await bookingPage.eventTitle.textContent();
+    expect(titleAfter).toBe(titleBefore);
   });
 });

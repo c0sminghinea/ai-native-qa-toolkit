@@ -1,0 +1,59 @@
+name: AI Quarantine (non-blocking)
+
+# AI-generated specs run on their own cadence so LLM drift never blocks PRs.
+# Failures here are signal to regenerate, not to revert. The toolkit itself is
+# target-agnostic — these specs are produced against the configured example.
+on:
+  schedule:
+    - cron: '0 7 * * *' # Daily at 07:00 UTC, after the main e2e nightly
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  quarantine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Don't fail the workflow even if the suite is red — these are advisory.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Regenerate AI specs
+        run: npx tsx ai-tools/generate-tests.ts || echo "::warning::Generator failed; running last committed AI specs"
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_CACHE: '1'
+
+      - name: Run quarantined AI specs
+        run: npm run test:ai-generated
+        env:
+          BASE_URL: ${{ vars.BASE_URL || 'https://cal.com' }}
+          CI: true
+
+      - name: Upload quarantine report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-quarantine-report
+          path: playwright-report/
+          retention-days: 7

@@ -18,12 +18,25 @@ export function ensureDir(dir: string): void {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
-/** Writes a report file to the project root. Silent when quiet=true. */
-export function saveReport(filename: string, content: string, quiet = false): void {
-  const fullPath = path.join(process.cwd(), filename);
+/**
+ * Directory under which all generated tool reports are written.
+ * Lives under `runs/` (already gitignored) so reports never clutter the repo root.
+ * Override with REPORT_DIR=. to restore old "write to root" behaviour.
+ */
+export const REPORT_DIR = process.env.REPORT_DIR || path.join('runs', 'reports');
+
+/**
+ * Writes a report file under {@link REPORT_DIR}. Silent when quiet=true.
+ * Returns the workspace-relative path actually written.
+ */
+export function saveReport(filename: string, content: string, quiet = false): string {
+  const relPath = path.join(REPORT_DIR, filename);
+  const fullPath = path.join(process.cwd(), relPath);
+  ensureDir(path.dirname(fullPath));
   fs.writeFileSync(fullPath, content);
-  recordArtifact(filename);
-  if (!quiet) console.log(`\n📄 Report saved to: ${filename}`);
+  recordArtifact(relPath);
+  if (!quiet) console.log(`\n📄 Report saved to: ${relPath}`);
+  return relPath;
 }
 
 /**

@@ -5,5 +5,6 @@ test-results
 visual-regression
 persona-screenshots
 agent-screenshots
+runs
 *.md
 package-lock.json

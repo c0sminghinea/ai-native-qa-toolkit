@@ -71,8 +71,11 @@ Provide:
     log.info('📋 Analysis:\n');
     log.info(analysis);
     log.info('\n');
-    const reportPath = 'failure-analysis-report.md';
-    saveReport(reportPath, `# Failure Analysis Report\n\n${analysis}`, flags.quiet || flags.json);
+    const reportPath = saveReport(
+      'failure-analysis-report.md',
+      `# Failure Analysis Report\n\n${analysis}`,
+      flags.quiet || flags.json
+    );
 
     if (flags.json) {
       log.json({ ok: true, reportPath, analysis });

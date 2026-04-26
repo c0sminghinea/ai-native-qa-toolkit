@@ -1,1 +1,14 @@
+# Fast regex-based secret scan (always runs, no external deps).
+npx tsx scripts/check-secrets.ts
+
+# Defense-in-depth: full gitleaks scan on staged changes if the binary is
+# installed locally. Mirrors the CI job so leaks are caught before push.
+# Install: `brew install gitleaks` — see https://github.com/gitleaks/gitleaks
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact --no-banner --verbose
+else
+  echo "[pre-commit] gitleaks not found on PATH — skipping deep scan."
+  echo "[pre-commit] Install it for stronger protection: brew install gitleaks"
+fi
+
 npx lint-staged

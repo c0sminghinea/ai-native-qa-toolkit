@@ -1,7 +1,13 @@
 import { Page, Locator } from '@playwright/test';
-import { DEFAULT_BOOKING_PATH } from '../../ai-tools/tool-utils';
+import { SELECTORS, TARGET, DEFAULT_BOOKING_PATH } from '../../../../ai-tools/selectors';
 
-export const DEFAULT_HOST_NAME = process.env.HOST_NAME || 'Bailey Pumfleet';
+/**
+ * Example page object for the bundled cal.com demo. Selector strings come
+ * from {@link SELECTORS} (overridable via `selectors.json` produced by
+ * `discover-selectors.ts`), so re-pointing the toolkit at another booking
+ * app does not require editing this file.
+ */
+export const DEFAULT_HOST_NAME = TARGET.hostName;
 
 export class BookingPage {
   readonly page: Page;
@@ -16,18 +22,18 @@ export class BookingPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.bookerContainer = page.getByTestId('booker-container');
-    this.eventTitle = page.getByTestId('event-title');
-    this.eventMeta = page.getByTestId('event-meta');
-    this.monthLabel = page.getByTestId('selected-month-label');
-    this.prevMonthButton = page.getByTestId('decrementMonth');
-    this.nextMonthButton = page.getByTestId('incrementMonth');
-    this.timezoneSelect = page.getByTestId('timezone-select');
-    this.overlayCalendarSwitch = page.getByTestId('overlay-calendar-switch');
+    this.bookerContainer = page.getByTestId(SELECTORS.BOOKER_CONTAINER);
+    this.eventTitle = page.getByTestId(SELECTORS.EVENT_TITLE);
+    this.eventMeta = page.getByTestId(SELECTORS.EVENT_META);
+    this.monthLabel = page.getByTestId(SELECTORS.MONTH_LABEL);
+    this.prevMonthButton = page.getByTestId(SELECTORS.PREV_MONTH);
+    this.nextMonthButton = page.getByTestId(SELECTORS.NEXT_MONTH);
+    this.timezoneSelect = page.getByTestId(SELECTORS.TIMEZONE_SELECT);
+    this.overlayCalendarSwitch = page.getByTestId(SELECTORS.OVERLAY_CALENDAR_SWITCH);
   }
 
   get availableDays(): Locator {
-    return this.page.getByTestId('day').and(this.page.locator(':not([disabled])'));
+    return this.page.getByTestId(SELECTORS.DAY).and(this.page.locator(':not([disabled])'));
   }
 
   get firstAvailableDay(): Locator {
@@ -35,7 +41,7 @@ export class BookingPage {
   }
 
   get firstTimeSlot(): Locator {
-    return this.page.getByTestId('time').first();
+    return this.page.getByTestId(SELECTORS.TIME).first();
   }
 
   get nameField(): Locator {

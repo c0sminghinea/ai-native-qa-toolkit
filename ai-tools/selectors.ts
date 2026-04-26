@@ -116,6 +116,9 @@ export const TARGET = {
   description:
     process.env.QA_TARGET_DESCRIPTION ||
     'a scheduling and booking platform (the default example is cal.com)',
+  // Display name of the host/profile shown on the example booker page.
+  // Used by example specs as a content sanity check; override per target.
+  hostName: process.env.QA_TARGET_HOST_NAME || process.env.HOST_NAME || 'Bailey Pumfleet',
   baseUrl: DEFAULT_BASE_URL,
   bookingPath: DEFAULT_BOOKING_PATH,
   bookingUrl: DEFAULT_TARGET_URL,
