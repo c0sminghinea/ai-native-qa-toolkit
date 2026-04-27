@@ -1,0 +1,13 @@
+{
+  "$schema": "Cal.com demo selectors. Used as a fallback when no selectors.json exists at the workspace root. Generate your own by running: npx tsx ai-tools/discover-selectors.ts <url>",
+  "BOOKER_CONTAINER": "booker-container",
+  "EVENT_TITLE": "event-title",
+  "EVENT_META": "event-meta",
+  "MONTH_LABEL": "selected-month-label",
+  "PREV_MONTH": "decrementMonth",
+  "NEXT_MONTH": "incrementMonth",
+  "TIMEZONE_SELECT": "timezone-select",
+  "OVERLAY_CALENDAR_SWITCH": "overlay-calendar-switch",
+  "DAY": "day",
+  "TIME": "time"
+}

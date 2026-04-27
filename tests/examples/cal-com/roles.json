@@ -1,0 +1,13 @@
+{
+  "$schema": "Role definitions consumed by `ai-tools/discover-selectors.ts`. Each key is a semantic role; each value is a description the LLM uses to find the matching `data-testid` on a target page. Pass --roles <path> to use a different set, or copy this file to roles.json at the workspace root.",
+  "BOOKER_CONTAINER": "The outer wrapper element that contains the entire booking widget (calendar + time slots).",
+  "EVENT_TITLE": "The element showing the title of the event being booked (e.g. \"30 Min Meeting\").",
+  "EVENT_META": "The element showing event metadata such as duration, location, or description, near the title.",
+  "MONTH_LABEL": "The text element displaying the currently visible month, e.g. \"October 2025\".",
+  "PREV_MONTH": "The button that navigates the calendar to the previous month.",
+  "NEXT_MONTH": "The button that navigates the calendar to the next month.",
+  "TIMEZONE_SELECT": "The control (button or select) that lets the user change their timezone.",
+  "OVERLAY_CALENDAR_SWITCH": "A toggle/switch for overlaying the user's personal calendar on top of availability.",
+  "DAY": "A single selectable day cell in the calendar grid.",
+  "TIME": "A single selectable time slot button shown after a day is picked."
+}

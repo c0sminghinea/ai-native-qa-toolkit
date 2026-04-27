@@ -11,11 +11,39 @@ import {
   DEFAULT_TARGET_URL,
   type CliFlags,
 } from './tool-utils';
-import { SELECTOR_ROLE_DESCRIPTIONS, type SelectorKey } from './selectors';
 import { captureDomSnapshot, formatDomSnapshot } from './dom-snapshot';
 import * as fs from 'fs';
 import * as path from 'path';
 import { z } from 'zod';
+
+/**
+ * Loads `{ROLE: description}` map. Search order:
+ *   1. `--roles <path>` flag.
+ *   2. `roles.json` at the workspace root.
+ *   3. `tests/examples/cal-com/roles.json` (bundled demo fallback).
+ * Throws when none exist so the user gets a clear error.
+ * Keys starting with `$` (metadata) are stripped.
+ */
+export function loadRoleDescriptions(rolesPath?: string): Record<string, string> {
+  const candidates = [
+    rolesPath,
+    path.join(process.cwd(), 'roles.json'),
+    path.join(process.cwd(), 'tests', 'examples', 'cal-com', 'roles.json'),
+  ].filter((p): p is string => typeof p === 'string' && p.length > 0);
+  for (const fp of candidates) {
+    if (!fs.existsSync(fp)) continue;
+    const raw = JSON.parse(fs.readFileSync(fp, 'utf-8')) as Record<string, unknown>;
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(raw)) {
+      if (k.startsWith('$')) continue;
+      if (typeof v === 'string' && v.trim().length > 0) out[k] = v.trim();
+    }
+    if (Object.keys(out).length > 0) return out;
+  }
+  throw new Error(
+    'No roles.json found. Pass --roles <path>, create roles.json at the workspace root, or keep the bundled tests/examples/cal-com/roles.json.'
+  );
+}
 
 /**
  * Builds a Zod schema with one optional `string | null` per role key.
@@ -74,7 +102,8 @@ export function buildFileBody(
 async function discoverSelectors(
   url: string,
   outputPath: string,
-  flags: CliFlags = { json: false, quiet: false, help: false, stats: false, positional: [] }
+  flags: CliFlags = { json: false, quiet: false, help: false, stats: false, positional: [] },
+  rolesPath?: string
 ): Promise<void> {
   const log = (msg: string) => {
     if (!flags.quiet && !flags.json) console.log(msg);
@@ -89,7 +118,8 @@ async function discoverSelectors(
     throw new Error(`Invalid URL: "${url}" — must start with http or https`);
   }
 
-  const roleKeys = Object.keys(SELECTOR_ROLE_DESCRIPTIONS) as SelectorKey[];
+  const roleDescriptions = loadRoleDescriptions(rolesPath);
+  const roleKeys = Object.keys(roleDescriptions);
 
   const snapshotText = await withBrowser(async browser => {
     const page = await (await browser.newContext()).newPage();
@@ -106,7 +136,7 @@ async function discoverSelectors(
 
   const MappingSchema = buildMappingSchema(roleKeys);
 
-  const rolesBlock = roleKeys.map(k => `  ${k}: ${SELECTOR_ROLE_DESCRIPTIONS[k]}`).join('\n');
+  const rolesBlock = roleKeys.map(k => `  ${k}: ${roleDescriptions[k]}`).join('\n');
 
   const result = await groqChatJSON(
     {
@@ -194,7 +224,11 @@ Exits with code 1 if no roles could be mapped.
   );
   const url = flags.positional[0] || DEFAULT_TARGET_URL;
   const outputPath = path.resolve(process.cwd(), flags.positional[1] || 'selectors.json');
-  discoverSelectors(url, outputPath, flags)
+  // Read --roles <path> manually since parseCliFlags doesn't know about it.
+  const rolesIdx = process.argv.indexOf('--roles');
+  const rolesPath =
+    rolesIdx >= 0 && process.argv[rolesIdx + 1] ? process.argv[rolesIdx + 1] : undefined;
+  discoverSelectors(url, outputPath, flags, rolesPath)
     .catch(err =>
       handleToolError(err, {
         URL: 'Usage: npx tsx ai-tools/discover-selectors.ts https://your-app.com',

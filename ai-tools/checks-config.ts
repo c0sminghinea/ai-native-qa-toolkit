@@ -3,17 +3,20 @@
  *
  * A `qa-checks.json` file at the workspace root (or a path passed via
  * `--checks <path>`) describes which data points to verify across which
- * pages. URL fields support `{TARGET.bookingUrl}` and `{TARGET.profileUrl}`
- * placeholders so a single config works regardless of BASE_URL/BOOKING_PATH.
+ * pages. URL fields support `{TARGET.bookingUrl}` / `{TARGET.profileUrl}`
+ * (kept for backward compatibility with the cal.com pack) and
+ * `{TARGET.baseUrl}` / `{TARGET.startUrl}` placeholders so a single config
+ * works regardless of BASE_URL/START_PATH.
  *
- * If no config file is present, a cal.com preset is returned so the tool
- * still works out of the box.
+ * Targets that need a fallback set of checks pass a `fallback` callback to
+ * `loadChecksConfig` — the toolkit core does not bake in any one product's
+ * default checks.
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
 import { z } from 'zod';
-import { TARGET, DEFAULT_TARGET_URL } from './selectors';
+import { TARGET } from './selectors';
 
 const PageCheckSchema = z.object({
   name: z.string().min(1),
@@ -38,13 +41,23 @@ const DEFAULT_CONFIG_FILENAME = 'qa-checks.json';
 
 /**
  * Resolves `{TARGET.<field>}` placeholders against the runtime TARGET object.
- * Currently supports `bookingUrl`, `profileUrl`, `baseUrl`.
+ *
+ * Supports the generic toolkit fields (`baseUrl`, `startUrl`) plus two
+ * scheduling-shaped aliases (`bookingUrl`, `profileUrl`) that are kept for
+ * backward compatibility with the cal.com pack — they fall back to
+ * `startUrl` when the underlying TARGET doesn't define them.
  */
 function expandPlaceholders(value: string): string {
+  const t = TARGET as Record<string, unknown>;
+  const baseUrl = typeof t.baseUrl === 'string' ? t.baseUrl : '';
+  const startUrl = typeof t.startUrl === 'string' ? t.startUrl : '';
+  const bookingUrl = typeof t.bookingUrl === 'string' ? t.bookingUrl : startUrl;
+  const profileUrl = typeof t.profileUrl === 'string' ? t.profileUrl : startUrl;
   return value
-    .replace(/\{TARGET\.bookingUrl\}/g, TARGET.bookingUrl)
-    .replace(/\{TARGET\.profileUrl\}/g, TARGET.profileUrl)
-    .replace(/\{TARGET\.baseUrl\}/g, TARGET.baseUrl);
+    .replace(/\{TARGET\.bookingUrl\}/g, bookingUrl)
+    .replace(/\{TARGET\.profileUrl\}/g, profileUrl)
+    .replace(/\{TARGET\.startUrl\}/g, startUrl)
+    .replace(/\{TARGET\.baseUrl\}/g, baseUrl);
 }
 
 function expandConfig(config: ChecksConfig): Check[] {
@@ -54,43 +67,29 @@ function expandConfig(config: ChecksConfig): Check[] {
   }));
 }
 
-/** Cal.com preset — the default checks bundled when no config is provided. */
-export function defaultChecks(): Check[] {
-  const PROFILE_URL = TARGET.profileFromBookingUrl(DEFAULT_TARGET_URL);
-  const EVENT_URL = DEFAULT_TARGET_URL;
-  return [
-    {
-      key: 'host name',
-      pages: [
-        { name: 'Profile Page', url: PROFILE_URL, description: 'Main profile listing page' },
-        { name: 'Event Page', url: EVENT_URL, description: 'Individual event booking page' },
-      ],
-    },
-    {
-      key: 'event duration',
-      pages: [
-        { name: 'Profile Page', url: PROFILE_URL, description: 'Duration on profile listing' },
-        { name: 'Event Page', url: EVENT_URL, description: 'Duration on booking page' },
-      ],
-    },
-    {
-      key: 'meeting platform (Google Meet / Zoom / location)',
-      pages: [
-        { name: 'Profile Page', url: PROFILE_URL, description: 'Meeting platform on profile' },
-        { name: 'Event Page', url: EVENT_URL, description: 'Meeting platform on booking page' },
-      ],
-    },
-  ];
-}
-
 /**
- * Loads checks from disk if present, otherwise returns the bundled defaults.
+ * Loads checks from disk, optionally falling back to a caller-supplied
+ * provider when no config file is found. The toolkit core never bakes in a
+ * product-specific default — packs (e.g. `tests/examples/cal-com/target.ts`)
+ * expose their own `…Checks()` function and pass it as `fallback`.
+ *
  * Resolution order:
  *   1. explicit `configPath` argument (errors if missing/invalid)
  *   2. `./qa-checks.json` at the workspace root (silently falls back if missing)
- *   3. bundled cal.com defaults
+ *   3. `fallback()` if provided
+ *   4. throws — no config available
  */
-export function loadChecksConfig(configPath?: string): {
+export interface LoadChecksOptions {
+  /** Provider invoked when no config file is found. */
+  fallback?: () => Check[];
+  /** Human label describing where `fallback` came from (printed in CLI output). */
+  fallbackLabel?: string;
+}
+
+export function loadChecksConfig(
+  configPath?: string,
+  options: LoadChecksOptions = {}
+): {
   checks: Check[];
   source: string;
 } {
@@ -101,7 +100,16 @@ export function loadChecksConfig(configPath?: string): {
     if (explicit) {
       throw new Error(`Checks config not found: ${resolved}`);
     }
-    return { checks: defaultChecks(), source: 'bundled defaults (cal.com preset)' };
+    if (options.fallback) {
+      return {
+        checks: options.fallback(),
+        source: options.fallbackLabel ?? 'caller-supplied fallback',
+      };
+    }
+    throw new Error(
+      `No qa-checks.json found at ${resolved} and no fallback provider supplied. ` +
+        'Pass --checks <path> or create qa-checks.json at the workspace root.'
+    );
   }
 
   let raw: unknown;

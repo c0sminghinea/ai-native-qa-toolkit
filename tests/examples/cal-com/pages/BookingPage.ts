@@ -1,11 +1,15 @@
 import { Page, Locator } from '@playwright/test';
-import { SELECTORS, TARGET, DEFAULT_BOOKING_PATH } from '../../../../ai-tools/selectors';
+import {
+  CAL_COM_SELECTORS as SELECTORS,
+  CAL_COM_TARGET as TARGET,
+  CAL_COM_BOOKING_PATH as DEFAULT_BOOKING_PATH,
+} from '../target';
 
 /**
  * Example page object for the bundled cal.com demo. Selector strings come
- * from {@link SELECTORS} (overridable via `selectors.json` produced by
- * `discover-selectors.ts`), so re-pointing the toolkit at another booking
- * app does not require editing this file.
+ * from the cal.com target pack ([../target.ts](../target.ts)), so re-pointing
+ * the toolkit at another booking app means copying this folder to a new pack
+ * rather than editing this file.
  */
 export const DEFAULT_HOST_NAME = TARGET.hostName;
 

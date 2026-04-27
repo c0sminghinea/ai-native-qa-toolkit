@@ -12,6 +12,7 @@ import {
   wrapUntrusted,
   maybePrintStats,
   DEFAULT_TARGET_URL,
+  SELECTORS,
   type CliFlags,
 } from './tool-utils';
 import { captureDomSnapshot, formatDomSnapshot } from './dom-snapshot';
@@ -334,7 +335,10 @@ Suggests Playwright locator replacements for a broken selector and verifies them
 Exits with code 1 if no verified visible replacement is found.
 `
   );
-  const rawInput = flags.positional[0] || "getByTestId('event-title')";
+  const defaultBrokenSelector = SELECTORS.EVENT_TITLE
+    ? `getByTestId('${SELECTORS.EVENT_TITLE}')`
+    : "getByTestId('your-broken-testid')";
+  const rawInput = flags.positional[0] || defaultBrokenSelector;
   const url = flags.positional[1] || DEFAULT_TARGET_URL;
 
   let brokenSelector: string;

@@ -12,6 +12,8 @@ import {
 import { loadChecksConfig, extractChecksFlag } from './checks-config';
 import { type Browser } from '@playwright/test';
 import { z } from 'zod';
+import * as fs from 'fs';
+import * as path from 'path';
 
 interface PageCheck {
   name: string;
@@ -364,7 +366,22 @@ and exits with code 1 if any inconsistency is found.
   let checksToRun;
   let source: string;
   try {
-    const checksPath = extractChecksFlag(process.argv.slice(2));
+    // Resolution order:
+    //   1. --checks <path> if given
+    //   2. ./qa-checks.json at workspace root
+    //   3. tests/examples/cal-com/qa-checks.json (bundled demo, if still present)
+    //   4. error
+    const explicitPath = extractChecksFlag(process.argv.slice(2));
+    let checksPath = explicitPath;
+    if (!checksPath) {
+      const root = path.join(process.cwd(), 'qa-checks.json');
+      const calComPack = path.join(process.cwd(), 'tests', 'examples', 'cal-com', 'qa-checks.json');
+      if (fs.existsSync(root)) {
+        checksPath = undefined; // loadChecksConfig will resolve to root by default
+      } else if (fs.existsSync(calComPack)) {
+        checksPath = calComPack;
+      }
+    }
     const loaded = loadChecksConfig(checksPath);
     checksToRun = loaded.checks;
     source = loaded.source;

@@ -1,11 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { SELECTORS, TARGET, defaultProfileFromBookingUrl } from '../../../ai-tools/selectors';
+import { CAL_COM_SELECTORS as SELECTORS, CAL_COM_TARGET as TARGET } from './target';
 
 // Example suite — profile/landing page that contains links to bookable
-// events. Selector strings flow through SELECTORS, so `selectors.json`
-// overrides are honoured automatically when the toolkit is re-pointed.
-const BOOKING_URL = TARGET.bookingUrl;
-const PROFILE_URL = defaultProfileFromBookingUrl(BOOKING_URL);
+// events. Selector strings come from the cal.com target pack ([target.ts](target.ts)),
+// so re-pointing the toolkit means copying this folder, not editing this file.
+const PROFILE_URL = TARGET.profileUrl;
 
 test.describe('Example: profile page', () => {
   test.beforeEach(async ({ page }) => {

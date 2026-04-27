@@ -5,6 +5,7 @@ import {
   saveReport,
   DEFAULT_TARGET_URL,
   TARGET,
+  SELECTORS,
   parseCliFlags,
   maybePrintHelpAndExit,
   redirectLogsForJson,
@@ -141,12 +142,15 @@ async function testPersona(
     await page.goto(DEFAULT_TARGET_URL, { timeout: 15000 });
     findings.push('✅ Page loaded successfully');
 
-    // Check event title
+    // Check event title — only run when the active target defines an EVENT_TITLE selector.
+    // Generic targets without scheduling semantics will skip this assertion silently.
+    const eventTitleId = SELECTORS.EVENT_TITLE;
     const titleVisible =
-      (await page
-        .getByTestId('event-title')
-        .isVisible()
-        .catch(() => false)) ||
+      (eventTitleId &&
+        (await page
+          .getByTestId(eventTitleId)
+          .isVisible()
+          .catch(() => false))) ||
       (await page
         .locator('h1')
         .first()
@@ -154,7 +158,7 @@ async function testPersona(
         .catch(() => false));
     if (titleVisible) {
       findings.push('✅ Event title visible');
-    } else {
+    } else if (eventTitleId) {
       frictionPoints.push(
         '⚠️  UX: Event title not immediately visible — user may not know what they are booking'
       );
@@ -205,14 +209,19 @@ async function testPersona(
     // Click a date and check time slots
     await dateButton.click({ timeout: 3000 }).catch(() => null);
 
-    const timeSlotsVisible = await page
-      .getByTestId('time')
-      .first()
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
+    // Skip the time-slot assertion when the active target hasn't defined a TIME selector
+    // (e.g. a non-scheduling target that's just being smoke-tested).
+    const timeSlotId = SELECTORS.TIME;
+    const timeSlotsVisible = timeSlotId
+      ? await page
+          .getByTestId(timeSlotId)
+          .first()
+          .isVisible({ timeout: 5000 })
+          .catch(() => false)
+      : false;
     if (timeSlotsVisible) {
       findings.push('✅ Time slots rendered after date selection');
-    } else {
+    } else if (timeSlotId) {
       frictionPoints.push(
         '⚠️  UX: Time slots did not appear after selecting a date — booking flow broken or delayed'
       );

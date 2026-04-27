@@ -1,68 +1,71 @@
 /**
- * Target configuration — the single place where cal.com-specific knowledge
- * lives. To point this toolkit at a different scheduling/booking app,
- * override via env vars (BASE_URL, BOOKING_PATH, QA_TARGET_NAME,
- * QA_TARGET_DESCRIPTION) or edit the constants below.
+ * Target configuration registry.
  *
- * Tools must import from this module instead of hardcoding URLs, paths,
+ * The toolkit core is **target-agnostic**. Every cal.com-specific value lives
+ * in the bundled example pack at [tests/examples/cal-com/target.ts](../tests/examples/cal-com/target.ts).
+ * Re-point the toolkit at your own app by either:
+ *
+ *   1. Editing `selectors.json` at the workspace root (created automatically
+ *      by `npx tsx ai-tools/discover-selectors.ts <url>`).
+ *   2. Setting env vars: `BASE_URL`, `BOOKING_PATH`, `QA_TARGET_NAME`,
+ *      `QA_TARGET_DESCRIPTION`, `QA_TARGET_HOST_NAME`.
+ *   3. Adding a new pack under `tests/examples/<your-app>/target.ts` that
+ *      mirrors the cal.com pack.
+ *
+ * Tools must import from this module rather than hardcoding URLs, paths,
  * or `data-testid` strings.
- *
- * Selector overrides
- * ──────────────────
- * If `./selectors.json` exists at the workspace root, its values override
- * the cal.com defaults below. Generate it automatically by running:
- *     npx tsx ai-tools/discover-selectors.ts <url>
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
 
-/**
- * `data-testid` registry. Cal.com defaults are bundled; override per-project
- * by running `discover-selectors.ts` (writes `selectors.json`) or by editing
- * the JSON file directly. Tools reference these symbolically so a single
- * change propagates everywhere.
- */
-const DEFAULT_SELECTORS = {
-  BOOKER_CONTAINER: 'booker-container',
-  EVENT_TITLE: 'event-title',
-  EVENT_META: 'event-meta',
-  MONTH_LABEL: 'selected-month-label',
-  PREV_MONTH: 'decrementMonth',
-  NEXT_MONTH: 'incrementMonth',
-  TIMEZONE_SELECT: 'timezone-select',
-  OVERLAY_CALENDAR_SWITCH: 'overlay-calendar-switch',
-  DAY: 'day',
-  TIME: 'time',
-} as const;
+// ─── Selector registry ────────────────────────────────────────────────────
+// Every selector is now optional — the toolkit core makes no assumption that
+// any particular role exists. Tools must guard `SELECTORS.X` with an
+// `if (X)` check before using it.
 
-export type SelectorKey = keyof typeof DEFAULT_SELECTORS;
+export type SelectorKey = string;
 
 /**
- * Loads selector overrides from `./selectors.json` at the workspace root if
- * present. Unknown keys are ignored; non-string values are skipped. Returns
- * an empty object on any read/parse error so the toolkit always starts.
+ * Loads `selectors.json` from the workspace root. When the file is absent,
+ * falls back to `tests/examples/cal-com/selectors.json` so the bundled demo
+ * still has working selectors out of the box. Users opt out by either
+ * replacing `selectors.json` at root or deleting the pack.
+ *
+ * Metadata keys (those starting with `$`) are stripped, non-string values
+ * are dropped, and empty strings are ignored. Returns `{}` on any read or
+ * parse error so the toolkit always boots.
  */
-function loadSelectorOverrides(): Partial<Record<SelectorKey, string>> {
-  try {
-    const filePath = path.join(process.cwd(), 'selectors.json');
-    if (!fs.existsSync(filePath)) return {};
-    const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as Record<string, unknown>;
-    const overrides: Partial<Record<SelectorKey, string>> = {};
-    for (const key of Object.keys(DEFAULT_SELECTORS) as SelectorKey[]) {
-      const v = raw[key];
-      if (typeof v === 'string' && v.trim().length > 0) overrides[key] = v.trim();
+function loadSelectorOverlay(): Partial<Record<string, string>> {
+  const candidates = [
+    path.join(process.cwd(), 'selectors.json'),
+    path.join(process.cwd(), 'tests', 'examples', 'cal-com', 'selectors.json'),
+  ];
+  for (const fp of candidates) {
+    try {
+      if (!fs.existsSync(fp)) continue;
+      const raw = JSON.parse(fs.readFileSync(fp, 'utf-8')) as Record<string, unknown>;
+      const out: Record<string, string> = {};
+      for (const [k, v] of Object.entries(raw)) {
+        if (k.startsWith('$')) continue; // skip $schema, $generatedAt
+        if (typeof v === 'string' && v.trim().length > 0) out[k] = v.trim();
+      }
+      return out;
+    } catch {
+      // try next candidate
     }
-    return overrides;
-  } catch {
-    return {};
   }
+  return {};
 }
 
-export const SELECTORS: Record<SelectorKey, string> = {
-  ...DEFAULT_SELECTORS,
-  ...loadSelectorOverrides(),
-};
+/**
+ * `data-testid` registry, populated from `selectors.json` at the workspace
+ * root with a fallback to the bundled cal.com pack. Empty when neither
+ * source is present. Consumers must guard accesses against `undefined`.
+ */
+export const SELECTORS: Partial<Record<string, string>> = loadSelectorOverlay();
+
+// ─── Target metadata ──────────────────────────────────────────────────────
 
 /** Default booking path, overridable via BOOKING_PATH env var. */
 export const DEFAULT_BOOKING_PATH = process.env.BOOKING_PATH || '/bailey/chat';
@@ -108,6 +111,7 @@ export function defaultProfileFromBookingUrl(bookingUrl: string): string {
  * Override via env vars:
  *   QA_TARGET_NAME          short identifier (default: "cal.com")
  *   QA_TARGET_DESCRIPTION   human sentence used in LLM prompts
+
  *   BASE_URL                origin (default: https://cal.com)
  *   BOOKING_PATH            booking-page path (default: /bailey/chat)
  */
@@ -115,34 +119,11 @@ export const TARGET = {
   name: process.env.QA_TARGET_NAME || 'cal.com',
   description:
     process.env.QA_TARGET_DESCRIPTION ||
-    'a scheduling and booking platform (the default example is cal.com)',
-  // Display name of the host/profile shown on the example booker page.
-  // Used by example specs as a content sanity check; override per target.
-  hostName: process.env.QA_TARGET_HOST_NAME || process.env.HOST_NAME || 'Bailey Pumfleet',
+    'the application under test (the bundled demo points at cal.com)',
   baseUrl: DEFAULT_BASE_URL,
   bookingPath: DEFAULT_BOOKING_PATH,
   bookingUrl: DEFAULT_TARGET_URL,
+  startUrl: DEFAULT_TARGET_URL,
   profileUrl: defaultProfileFromBookingUrl(DEFAULT_TARGET_URL),
   profileFromBookingUrl: defaultProfileFromBookingUrl,
 } as const;
-
-/**
- * Human-readable description of each selector role. Consumed by
- * `discover-selectors.ts` to instruct the LLM what each key is supposed to
- * identify on a page. Keep these descriptions semantic, not target-specific.
- */
-export const SELECTOR_ROLE_DESCRIPTIONS: Record<SelectorKey, string> = {
-  BOOKER_CONTAINER:
-    'The outer wrapper element that contains the entire booking widget (calendar + time slots).',
-  EVENT_TITLE: 'The element showing the title of the event being booked (e.g. "30 Min Meeting").',
-  EVENT_META:
-    'The element showing event metadata such as duration, location, or description, near the title.',
-  MONTH_LABEL: 'The text element displaying the currently visible month, e.g. "October 2025".',
-  PREV_MONTH: 'The button that navigates the calendar to the previous month.',
-  NEXT_MONTH: 'The button that navigates the calendar to the next month.',
-  TIMEZONE_SELECT: 'The control (button or select) that lets the user change their timezone.',
-  OVERLAY_CALENDAR_SWITCH:
-    'A toggle/switch for overlaying the user\u2019s personal calendar on top of availability.',
-  DAY: 'A single selectable day cell in the calendar grid.',
-  TIME: 'A single selectable time slot button shown after a day is picked.',
-};

@@ -1,5 +1,5 @@
 {
-  "$schema": "Declarative checks for ai-tools/data-consistency.ts. URL fields support {TARGET.bookingUrl}, {TARGET.profileUrl}, {TARGET.baseUrl} placeholders. Override per-project or pass --checks <path>.",
+  "$schema": "Cal.com example checks for ai-tools/data-consistency.ts. URL placeholders ({TARGET.bookingUrl}, {TARGET.profileUrl}, {TARGET.baseUrl}, {TARGET.startUrl}) are expanded at load time. To use this file: cp tests/examples/cal-com/qa-checks.json qa-checks.json — or pass --checks tests/examples/cal-com/qa-checks.json explicitly.",
   "checks": [
     {
       "key": "host name",

@@ -2,7 +2,17 @@ import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { loadChecksConfig, defaultChecks, extractChecksFlag } from '../ai-tools/checks-config';
+import { loadChecksConfig, extractChecksFlag, type Check } from '../ai-tools/checks-config';
+
+const SAMPLE_FALLBACK = (): Check[] => [
+  {
+    key: 'host name',
+    pages: [
+      { name: 'Profile', url: 'https://example.com/u', description: '' },
+      { name: 'Booking', url: 'https://example.com/u/event', description: '' },
+    ],
+  },
+];
 
 describe('extractChecksFlag', () => {
   it('reads space-separated --checks <path>', () => {
@@ -13,20 +23,6 @@ describe('extractChecksFlag', () => {
   });
   it('returns undefined when absent', () => {
     expect(extractChecksFlag(['--quiet'])).toBeUndefined();
-  });
-});
-
-describe('defaultChecks', () => {
-  it('returns the bundled cal.com preset with at least one check', () => {
-    const checks = defaultChecks();
-    expect(checks.length).toBeGreaterThan(0);
-    for (const c of checks) {
-      expect(c.key).toBeTruthy();
-      expect(c.pages.length).toBeGreaterThan(0);
-      for (const p of c.pages) {
-        expect(p.url).toMatch(/^https?:/);
-      }
-    }
   });
 });
 
@@ -44,11 +40,19 @@ describe('loadChecksConfig', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('falls back to bundled defaults when no file is present', () => {
+  it('uses the supplied fallback when no file is present', () => {
     process.chdir(tmpDir);
-    const { checks, source } = loadChecksConfig();
-    expect(checks.length).toBeGreaterThan(0);
-    expect(source).toMatch(/bundled defaults/);
+    const { checks, source } = loadChecksConfig(undefined, {
+      fallback: SAMPLE_FALLBACK,
+      fallbackLabel: 'sample fallback',
+    });
+    expect(checks).toHaveLength(1);
+    expect(source).toBe('sample fallback');
+  });
+
+  it('throws when no file and no fallback is supplied', () => {
+    process.chdir(tmpDir);
+    expect(() => loadChecksConfig()).toThrow(/no fallback/);
   });
 
   it('loads and expands TARGET placeholders', () => {

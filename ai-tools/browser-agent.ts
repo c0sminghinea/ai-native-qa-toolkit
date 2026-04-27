@@ -209,6 +209,7 @@ async function tryClick(
           await page.getByText(strategy.text, { exact: false }).first().click({ timeout: 3000 });
           return;
         case 'day-testid':
+          if (!SELECTORS.DAY) return; // no day testid configured for this target
           await page
             .getByTestId(SELECTORS.DAY)
             .filter({ hasText: new RegExp(`^${strategy.text}`) })
