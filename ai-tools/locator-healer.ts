@@ -54,7 +54,7 @@ interface VerifiedSuggestion {
  * Accepts either a broken-selector string or a path to a Playwright error log.
  * When given an error log, extracts the locator expression from the log output.
  */
-function extractBrokenSelector(input: string): string {
+export function extractBrokenSelector(input: string): string {
   if (fs.existsSync(input)) {
     const content = fs.readFileSync(input, 'utf-8').substring(0, 8000);
     // Playwright error format: "  Locator: page.getByTestId('foo')" or "Locator: getByText('bar')"

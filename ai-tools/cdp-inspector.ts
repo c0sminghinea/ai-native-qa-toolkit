@@ -26,6 +26,24 @@ interface ConsoleMessage {
   text: string;
 }
 
+/**
+ * Categorises captured network requests into API, failed (4xx/5xx), and
+ * slow (>1s) buckets. Pure — no I/O — exported for unit testing.
+ */
+export function categorizeRequests(networkRequests: NetworkRequest[]): {
+  apiRequests: NetworkRequest[];
+  failedRequests: NetworkRequest[];
+  slowRequests: NetworkRequest[];
+} {
+  return {
+    apiRequests: networkRequests.filter(
+      r => r.url.includes('/api/') || r.url.includes('trpc') || r.url.includes('graphql')
+    ),
+    failedRequests: networkRequests.filter(r => typeof r.status === 'number' && r.status >= 400),
+    slowRequests: networkRequests.filter(r => typeof r.timing === 'number' && r.timing > 1000),
+  };
+}
+
 async function inspectWithCDP(
   url: string,
   flags: CliFlags = { json: false, quiet: false, help: false, stats: false, positional: [] }
@@ -169,13 +187,7 @@ async function inspectWithCDP(
   interceptedLog.forEach(l => console.log(`   ${l}`));
   console.log();
 
-  const apiRequests = networkRequests.filter(
-    r => r.url.includes('/api/') || r.url.includes('trpc') || r.url.includes('graphql')
-  );
-
-  const failedRequests = networkRequests.filter(r => r.status && r.status >= 400);
-
-  const slowRequests = networkRequests.filter(r => r.timing && r.timing > 1000);
+  const { apiRequests, failedRequests, slowRequests } = categorizeRequests(networkRequests);
 
   // Print raw findings
   console.log(`📊 CDP Session Results:`);

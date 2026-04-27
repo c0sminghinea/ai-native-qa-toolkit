@@ -16,6 +16,56 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { z } from 'zod';
 
+/**
+ * Shape returned by the AI for a coverage review. Re-exported as a pure
+ * type so callers (and tests) don't have to depend on `groqChatJSON`.
+ */
+export interface CoverageAdvice {
+  score: number;
+  whatIsCovered: string[];
+  criticalGaps: string[];
+  topTestsToAdd: { name: string; why: string; code: string }[];
+}
+
+/**
+ * Pure markdown builder for the coverage-advisor report. Exported so unit
+ * tests can pin its shape without spinning up the LLM client.
+ */
+export function buildCoverageReport(
+  testFile: string,
+  advice: CoverageAdvice,
+  now: Date = new Date()
+): string {
+  return [
+    `# Coverage Advisor Report`,
+    ``,
+    `**Analyzed:** \`${testFile}\`  `,
+    `**Date:** ${now.toISOString().split('T')[0]}  `,
+    `**Score:** ${advice.score}/10`,
+    ``,
+    `## What is covered`,
+    ``,
+    ...advice.whatIsCovered.map(s => `- ${s}`),
+    ``,
+    `## Critical gaps`,
+    ``,
+    ...advice.criticalGaps.map(s => `- ${s}`),
+    ``,
+    `## Top tests to add`,
+    ``,
+    ...advice.topTestsToAdd.flatMap((t, i) => [
+      `### ${i + 1}. ${t.name}`,
+      ``,
+      `**Why:** ${t.why}`,
+      ``,
+      '```typescript',
+      t.code,
+      '```',
+      ``,
+    ]),
+  ].join('\n');
+}
+
 async function adviseCoverage(
   testFile: string,
   flags: CliFlags = { json: false, quiet: false, help: false, stats: false, positional: [] }
@@ -119,34 +169,7 @@ Limit topTestsToAdd to 3 entries.`,
       });
     }
 
-    const reportBody = [
-      `# Coverage Advisor Report`,
-      ``,
-      `**Analyzed:** \`${testFile}\`  `,
-      `**Date:** ${new Date().toISOString().split('T')[0]}  `,
-      `**Score:** ${advice.score}/10`,
-      ``,
-      `## What is covered`,
-      ``,
-      ...advice.whatIsCovered.map(s => `- ${s}`),
-      ``,
-      `## Critical gaps`,
-      ``,
-      ...advice.criticalGaps.map(s => `- ${s}`),
-      ``,
-      `## Top tests to add`,
-      ``,
-      ...advice.topTestsToAdd.flatMap((t, i) => [
-        `### ${i + 1}. ${t.name}`,
-        ``,
-        `**Why:** ${t.why}`,
-        ``,
-        '```typescript',
-        t.code,
-        '```',
-        ``,
-      ]),
-    ].join('\n');
+    const reportBody = buildCoverageReport(testFile, advice);
 
     const baseName = path.basename(testFile, '.spec.ts').replace(/[^a-z0-9-]/gi, '-');
     const reportPath = saveReport(

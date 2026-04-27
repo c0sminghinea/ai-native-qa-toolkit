@@ -16,6 +16,31 @@ import { type Browser } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 
+/**
+ * Extracts a `"N/10"` style score from an AI analysis blurb. Recognises both
+ * `7/10` and `7 out of 10` patterns. Returns 'N/A' when no score is present.
+ * Exported for unit testing.
+ */
+export function parseScoreFromAnalysis(analysis: string): string {
+  const m = analysis.match(/(\d+)\/10|(\d+) out of 10/i);
+  return m ? `${m[1] || m[2]}/10` : 'N/A';
+}
+
+/**
+ * Returns the lowest numeric score across viewport results. Non-numeric
+ * scores (e.g. 'N/A') are ignored — they default to 10 so they don't drag the
+ * exit code into failure when AI analysis is unavailable. Exported for tests.
+ */
+export function worstScore(results: { score: string }[]): number {
+  if (results.length === 0) return 10;
+  return Math.min(
+    ...results.map(r => {
+      const m = r.score.match(/^(\d+)/);
+      return m ? Number(m[1]) : 10;
+    })
+  );
+}
+
 async function captureScreenshot(
   browser: Browser,
   url: string,
@@ -209,19 +234,14 @@ ${r.analysis}
     if (!flags.quiet && !flags.json) console.log('📸 Screenshots saved to: visual-regression/');
 
     // Worst score determines exit code: 5/10 or below = failure
-    const worstScore = Math.min(
-      ...results.map(r => {
-        const m = r.score.match(/^(\d+)/);
-        return m ? Number(m[1]) : 10;
-      })
-    );
-    const failed = worstScore <= 5;
+    const worst = worstScore(results);
+    const failed = worst <= 5;
 
     if (flags.json) {
       process.stdout.write(
         JSON.stringify({
           ok: !failed,
-          worstScore,
+          worstScore: worst,
           viewports: results.map(r => ({ viewport: r.viewport, score: r.score })),
           reportPath,
         }) + '\n'

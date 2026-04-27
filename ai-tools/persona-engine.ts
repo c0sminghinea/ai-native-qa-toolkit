@@ -36,6 +36,7 @@ function safeTimezoneId(timezone: string): string {
     return 'UTC';
   }
 }
+export { safeTimezoneId };
 
 function timezoneToLocale(timezone: string): string {
   if (timezone.startsWith('America')) return 'en-US';
@@ -46,6 +47,7 @@ function timezoneToLocale(timezone: string): string {
   if (timezone.startsWith('Asia')) return 'en-IN';
   return 'en-US';
 }
+export { timezoneToLocale };
 
 async function generatePersonas(quiet = false): Promise<Persona[]> {
   if (!quiet) console.log('🧠 Generating edge case personas...\n');
@@ -393,6 +395,7 @@ async function runWithConcurrency<T>(
   await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, worker));
   return results;
 }
+export { runWithConcurrency };
 
 async function runPersonaEngine(
   flags: CliFlags = { json: false, quiet: false, help: false, stats: false, positional: [] }

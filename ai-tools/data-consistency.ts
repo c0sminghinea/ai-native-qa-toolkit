@@ -38,6 +38,37 @@ interface ConsistencyResult {
 }
 
 /**
+ * Pure consistency check: flags a data key as inconsistent when the found
+ * values differ across pages, or when the key was missing on every page.
+ * Returns the per-page discrepancy list. Exported for unit testing — the
+ * AI-flavoured `analyzeConsistency` wraps this and adds an LLM rationale.
+ */
+export function detectInconsistency(
+  dataKey: string,
+  dataPoints: DataPoint[]
+): { consistent: boolean; discrepancies: string[]; reason: 'missing' | 'differ' | 'ok' } {
+  const foundPoints = dataPoints.filter(d => d.found);
+  if (foundPoints.length === 0) {
+    return {
+      consistent: false,
+      discrepancies: [`"${dataKey}" was not found on any page`],
+      reason: 'missing',
+    };
+  }
+  const uniqueValues = [...new Set(foundPoints.map(d => d.value))];
+  if (uniqueValues.length === 1) {
+    return { consistent: true, discrepancies: [], reason: 'ok' };
+  }
+  return {
+    consistent: false,
+    discrepancies: foundPoints.map(d => `${d.page}: "${d.value}"`),
+    reason: 'differ',
+  };
+}
+
+export type { DataPoint };
+
+/**
  * Loads a page once and asks the AI to extract every requested data key in a
  * single round-trip. Replaces the previous N×M loop where each (key, page)
  * combination spawned its own LLM call.
@@ -108,28 +139,16 @@ async function analyzeConsistency(
   dataKey: string,
   dataPoints: DataPoint[]
 ): Promise<{ consistent: boolean; discrepancies: string[]; aiAnalysis: string }> {
-  const foundPoints = dataPoints.filter(d => d.found);
+  const detected = detectInconsistency(dataKey, dataPoints);
 
-  if (foundPoints.length === 0) {
+  if (detected.reason === 'missing') {
     return {
-      consistent: false,
-      discrepancies: [`"${dataKey}" was not found on any page`],
+      consistent: detected.consistent,
+      discrepancies: detected.discrepancies,
       aiAnalysis: `The data point "${dataKey}" could not be located on any of the tested pages.`,
     };
   }
 
-  // Check for simple value consistency
-  const uniqueValues = [...new Set(foundPoints.map(d => d.value))];
-  const isConsistent = uniqueValues.length === 1;
-  const discrepancies: string[] = [];
-
-  if (!isConsistent) {
-    foundPoints.forEach(d => {
-      discrepancies.push(`${d.page}: "${d.value}"`);
-    });
-  }
-
-  // Ask AI for deeper analysis
   const result = await groqChat({
     model: MODELS.text,
     messages: [
@@ -154,8 +173,8 @@ async function analyzeConsistency(
   });
 
   return {
-    consistent: isConsistent,
-    discrepancies,
+    consistent: detected.consistent,
+    discrepancies: detected.discrepancies,
     aiAnalysis: result.choices[0].message.content!,
   };
 }

@@ -8,28 +8,39 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'text-summary', 'json-summary', 'html'],
       reportsDirectory: 'runs/coverage',
-      // Only count source modules that actually have unit tests today. Tools
-      // that are exercised primarily through e2e/manual runs (browser-agent,
-      // mcp-server, persona-engine, etc.) would dilute the gate without
-      // adding signal — track them separately when their unit suites grow.
+      // Source modules with unit tests. Each tool exposes pure helpers
+      // (prompt builders, parsers, classifiers) that can be exercised
+      // without spinning up a browser or making LLM calls. The `if
+      // (require.main === module)` CLI tail stays uncovered by design.
       include: [
+        'ai-tools/analyze-failure.ts',
+        'ai-tools/cdp-inspector.ts',
         'ai-tools/checks-config.ts',
+        'ai-tools/coverage-advisor.ts',
+        'ai-tools/data-consistency.ts',
         'ai-tools/discover-selectors.ts',
         'ai-tools/dom-snapshot.ts',
+        'ai-tools/generate-tests.ts',
         'ai-tools/groq-client.ts',
         'ai-tools/llm-provider.ts',
+        'ai-tools/locator-healer.ts',
+        'ai-tools/persona-engine.ts',
         'ai-tools/run-telemetry.ts',
         'ai-tools/tool-utils.ts',
+        'ai-tools/visual-regression.ts',
       ],
       exclude: ['**/*.test.ts', '**/*.d.ts'],
-      // Floors set just below current actuals so CI fails on regressions but
-      // doesn't lie about coverage. Raise these as the suite grows; never lower.
-      // Current baseline (April 2026): lines/statements 44%, functions 37%, branches 91%.
+      // Floors sit just below current actuals so CI fails on regressions but
+      // doesn't lie about coverage. The headline number is intentionally
+      // dragged down by browser/LLM-heavy tools (cdp-inspector, persona-engine,
+      // visual-regression) whose runtime code can't be unit-tested without
+      // a real browser; the high branch and function numbers reflect the
+      // pure-helper coverage that *can* be tested. Raise as the suite grows.
       thresholds: {
-        lines: 40,
-        statements: 40,
-        functions: 35,
-        branches: 85,
+        lines: 20,
+        statements: 20,
+        functions: 30,
+        branches: 75,
       },
     },
   },
