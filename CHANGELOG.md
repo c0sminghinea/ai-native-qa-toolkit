@@ -8,6 +8,13 @@ project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Second example target pack: [tests/examples/wikipedia/](tests/examples/wikipedia)
+  — a non-scheduling target with no `data-testid` scaffold, used to validate
+  that the target-pack abstraction is genuinely target-shape-agnostic.
+  Includes `target.ts`, `selectors.json` (intentionally empty), `qa-checks.json`
+  (desktop ↔ mobile render consistency), `pages/ArticlePage.ts` POM with
+  semantic locators, and a 4-test cross-browser spec. Live-validated against
+  Chromium, Firefox, and WebKit.
 - `CHANGELOG.md` — this file.
 - `docs/tools.md` — extracted detailed reference for the 9 AI tools and MCP integrations.
 - `docs/architecture.md` — extracted engineering philosophy and key engineering decisions.

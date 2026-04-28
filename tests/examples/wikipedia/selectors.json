@@ -1,0 +1,3 @@
+{
+  "$schema": "Wikipedia exposes no data-testid attributes — this overlay is intentionally empty. The article POM at tests/examples/wikipedia/pages/ArticlePage.ts uses Playwright's semantic locators (getByRole / id) instead. This pack therefore exercises the toolkit's no-testid path."
+}

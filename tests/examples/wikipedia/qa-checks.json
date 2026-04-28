@@ -1,0 +1,35 @@
+{
+  "$schema": "Wikipedia example checks for ai-tools/data-consistency.ts. Compares the desktop and mobile renders of the same article — title and last-modified should agree. To use: cp tests/examples/wikipedia/qa-checks.json qa-checks.json — or pass --checks tests/examples/wikipedia/qa-checks.json explicitly.",
+  "checks": [
+    {
+      "key": "article title",
+      "pages": [
+        {
+          "name": "Desktop Article",
+          "url": "{TARGET.bookingUrl}",
+          "description": "Desktop render of the article"
+        },
+        {
+          "name": "Mobile Article",
+          "url": "{TARGET.profileUrl}",
+          "description": "Mobile render of the same article"
+        }
+      ]
+    },
+    {
+      "key": "last modified date",
+      "pages": [
+        {
+          "name": "Desktop Article",
+          "url": "{TARGET.bookingUrl}",
+          "description": "Footer last-edited timestamp on desktop"
+        },
+        {
+          "name": "Mobile Article",
+          "url": "{TARGET.profileUrl}",
+          "description": "Footer last-edited timestamp on mobile"
+        }
+      ]
+    }
+  ]
+}

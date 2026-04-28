@@ -77,7 +77,8 @@ qa-playwright/
     toolkit/            # Toolkit's own CLI smoke spec (offline, no API keys)
     examples/
       generic/          # Drop-in specs for any site (homepage smoke, a11y basics)
-      cal-com/          # Bundled live-target example (re-target via env vars)
+      cal-com/          # Bundled live-target example — scheduling app (re-target via env vars)
+      wikipedia/        # Second example — non-scheduling target with no testid scaffold
     ai-generated.spec.ts  # Quarantined output of generate-tests
   docs/
     tools.md            # Detailed reference for the 9 AI tools + MCP integrations
@@ -200,9 +201,14 @@ npx tsx cli.ts test
 
 ## Targeting your own app
 
-The toolkit ships pre-configured for [cal.com](https://cal.com) as a real-world
-example, but everything cal.com-specific lives in a single example pack:
-[tests/examples/cal-com/](tests/examples/cal-com). To point at your own app:
+The toolkit ships pre-configured for [cal.com](https://cal.com) as the
+primary real-world example. A second smaller pack against
+[Wikipedia](https://en.wikipedia.org) is included to validate that the
+abstraction is target-shape-agnostic — Wikipedia has no `data-testid`
+attributes and no booking flow, and the spec passes regardless. The two
+packs live side-by-side under [tests/examples/](tests/examples).
+
+To point the toolkit at your own app:
 
 1. **URL & paths** — set `BASE_URL` and `BOOKING_PATH` env vars (no code change
    needed). The `TARGET` object derives the booking and profile URLs from these
