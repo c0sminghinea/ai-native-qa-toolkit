@@ -121,7 +121,12 @@ Be specific. Reference actual elements you can see in the screenshot.`,
   }
 }
 
-async function compareViewports(
+/**
+ * Orchestrates a viewport-comparison run: capture screenshots at three
+ * sizes, feed each to the vision LLM, persist a report. Exported so
+ * integration tests can drive the pipeline with a mocked LLM.
+ */
+export async function compareViewports(
   url: string,
   flags: CliFlags = { json: false, quiet: false, help: false, stats: false, positional: [] }
 ) {

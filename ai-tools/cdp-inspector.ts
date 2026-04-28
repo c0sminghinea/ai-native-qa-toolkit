@@ -44,7 +44,12 @@ export function categorizeRequests(networkRequests: NetworkRequest[]): {
   };
 }
 
-async function inspectWithCDP(
+/**
+ * Orchestrates the CDP inspection flow: open a CDP session, capture
+ * network/console events, ask the LLM for an analysis, persist a report.
+ * Exported so integration tests can drive the pipeline with a mocked LLM.
+ */
+export async function inspectWithCDP(
   url: string,
   flags: CliFlags = { json: false, quiet: false, help: false, stats: false, positional: [] }
 ) {

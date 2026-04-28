@@ -236,7 +236,12 @@ async function tryClick(
   }
 }
 
-async function runAgent(
+/**
+ * Orchestrates the autonomous-agent loop: ask the LLM what to do next,
+ * execute the action, repeat up to `maxSteps`. Exported so integration
+ * tests can drive the loop with a mocked LLM.
+ */
+export async function runAgent(
   goal: string,
   startUrl: string,
   maxSteps = 8,

@@ -31,16 +31,17 @@ export default defineConfig({
       ],
       exclude: ['**/*.test.ts', '**/*.d.ts'],
       // Floors sit just below current actuals so CI fails on regressions but
-      // doesn't lie about coverage. The headline number is intentionally
-      // dragged down by browser/LLM-heavy tools (cdp-inspector, persona-engine,
-      // visual-regression) whose runtime code can't be unit-tested without
-      // a real browser; the high branch and function numbers reflect the
-      // pure-helper coverage that *can* be tested. Raise as the suite grows.
+      // doesn't lie about coverage. Bumped after exporting all 9 tool
+      // orchestrators and adding integration tests with mocked LLM under
+      // tests-unit/integration/, which raised line coverage from ~23% to
+      // ~62% and function coverage from ~37% to ~74%. Branch coverage
+      // dropped (more branches now exercised) but the floors still catch
+      // regressions. Raise as the suite grows.
       thresholds: {
-        lines: 20,
-        statements: 20,
-        functions: 30,
-        branches: 75,
+        lines: 60,
+        statements: 60,
+        functions: 70,
+        branches: 60,
       },
     },
   },

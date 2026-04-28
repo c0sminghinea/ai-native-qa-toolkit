@@ -54,7 +54,12 @@ Flags:
   --help     Show this message
 `;
 
-async function analyzeFailure(errorLog: string, testFile: string, flags: CliFlags) {
+/**
+ * Orchestrates the failure-analysis flow: read the test file, build the
+ * prompt, call the LLM, persist the report. Exported so integration tests
+ * can drive the pipeline with a mocked LLM.
+ */
+export async function analyzeFailure(errorLog: string, testFile: string, flags: CliFlags) {
   const log = new Logger(flags.quiet);
   log.info('\n🔍 Analyzing test failure...\n');
 

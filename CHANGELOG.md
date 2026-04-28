@@ -6,6 +6,25 @@ project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Test coverage jumped from 23% to 62% lines** (and 37% → 74% functions)
+  by exporting all remaining tool orchestrators and adding mocked-LLM
+  integration tests for each. Eight tools now have an integration spec
+  covering the full pipeline (browser launch where applicable, LLM call,
+  report persistence, JSON envelope, exit codes):
+  - `analyzeFailure` ([analyze-failure.integration.test.ts](tests-unit/integration/analyze-failure.integration.test.ts))
+  - `discoverSelectors` ([discover-selectors.integration.test.ts](tests-unit/integration/discover-selectors.integration.test.ts))
+  - `inspectWithCDP` ([cdp-inspector.integration.test.ts](tests-unit/integration/cdp-inspector.integration.test.ts))
+  - `compareViewports` ([visual-regression.integration.test.ts](tests-unit/integration/visual-regression.integration.test.ts))
+  - `runDataConsistencyCheck` ([data-consistency.integration.test.ts](tests-unit/integration/data-consistency.integration.test.ts))
+  - `generateTests` ([generate-tests.integration.test.ts](tests-unit/integration/generate-tests.integration.test.ts))
+  - `runAgent` ([browser-agent.integration.test.ts](tests-unit/integration/browser-agent.integration.test.ts))
+  - (plus the previously-added `healLocator` and `adviseCoverage`)
+- 146 tests across 27 files. Coverage thresholds in [vitest.config.ts](vitest.config.ts)
+  raised: lines/statements 20→60, functions 30→70 (branches lowered 75→60
+  because more branches are now exercised).
+
 ### Removed
 
 - Dead exports identified via `ts-prune` audit:

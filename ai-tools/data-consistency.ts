@@ -179,7 +179,13 @@ async function analyzeConsistency(
   };
 }
 
-async function runDataConsistencyCheck(
+/**
+ * Orchestrates a multi-page data-consistency run: extract data points from
+ * each unique page once, then analyse each key for consistency, then write
+ * a report. Exported so integration tests can drive the pipeline with a
+ * mocked LLM.
+ */
+export async function runDataConsistencyCheck(
   dataPoints: { key: string; pages: PageCheck[] }[],
   flags: CliFlags = { json: false, quiet: false, help: false, stats: false, positional: [] }
 ) {

@@ -99,7 +99,12 @@ export function buildFileBody(
  * This is the recommended way to onboard the toolkit against a new app:
  *   $ npx tsx ai-tools/discover-selectors.ts https://your-app.com/booking
  */
-async function discoverSelectors(
+/**
+ * Orchestrates the selector-discovery flow: launch a browser, capture the
+ * DOM, ask the LLM to map roles to testids, write `selectors.json`.
+ * Exported so integration tests can drive the pipeline with a mocked LLM.
+ */
+export async function discoverSelectors(
   url: string,
   outputPath: string,
   flags: CliFlags = { json: false, quiet: false, help: false, stats: false, positional: [] },

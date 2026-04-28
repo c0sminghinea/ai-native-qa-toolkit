@@ -212,7 +212,12 @@ export function typecheckFile(filePath: string): { ok: boolean; output: string }
   };
 }
 
-async function generateTests(
+/**
+ * Orchestrates the test-generation flow: explore the live page, ask the LLM
+ * for a spec, write the file, typecheck it. Exported so integration tests
+ * can drive the pipeline with a mocked LLM.
+ */
+export async function generateTests(
   url: string,
   outputPath?: string,
   flags: CliFlags = { json: false, quiet: false, help: false, stats: false, positional: [] }
