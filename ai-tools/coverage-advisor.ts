@@ -66,7 +66,12 @@ export function buildCoverageReport(
   ].join('\n');
 }
 
-async function adviseCoverage(
+/**
+ * Orchestrates the coverage-advisor flow: read the spec, gather POM and
+ * suite context, ask the LLM, persist the report. Exported so integration
+ * tests can drive the pipeline with a mocked LLM.
+ */
+export async function adviseCoverage(
   testFile: string,
   flags: CliFlags = { json: false, quiet: false, help: false, stats: false, positional: [] }
 ) {

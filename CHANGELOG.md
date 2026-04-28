@@ -8,6 +8,21 @@ project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Integration test layer under [tests-unit/integration/](tests-unit/integration)
+  that drives the LLM-orchestration tools end-to-end against an in-process
+  static HTML fixture with `groq-client` stubbed via `vi.mock`. Lifts
+  confidence on browser launch, DOM extraction, suggestion verification,
+  and report persistence without flakiness or API spend. Two tools covered:
+  - `locator-healer` (browser archetype): mocks `groqChat`, serves a static
+    page on a random `127.0.0.1` port, asserts the JSON envelope and the
+    saved markdown report. Exercises both the happy path and the
+    no-visible-suggestion `process.exit(1)` branch.
+  - `coverage-advisor` (file-I/O archetype): mocks `groqChatJSON` (with a
+    Zod schema), reads a self-contained spec fixture, asserts the JSON
+    envelope, the persisted report shape, and the score≤5 exit branch.
+  - Orchestrators `healLocator` and `adviseCoverage` are now exported
+    (previously private to their CLI entry points) so integration tests
+    can drive them directly.
 - ESLint enforcement of the **toolkit-core target-agnostic invariant**:
   `no-restricted-imports` rule scoped to `ai-tools/**` blocks any import
   from `tests/examples/**`, with a message pointing to

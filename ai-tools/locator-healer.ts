@@ -142,7 +142,13 @@ async function extractDomContext(page: Page): Promise<string> {
 
 // ─── Core ─────────────────────────────────────────────────────────────────────
 
-async function healLocator(
+/**
+ * Orchestrates the full healing flow: launch a browser, navigate to `url`,
+ * snapshot the DOM, ask the LLM for suggestions, verify each suggestion
+ * against the live page, and persist a markdown report. Exported so
+ * integration tests can drive the pipeline with a mocked LLM.
+ */
+export async function healLocator(
   brokenSelector: string,
   url: string,
   flags: CliFlags = { json: false, quiet: false, help: false, stats: false, positional: [] }
