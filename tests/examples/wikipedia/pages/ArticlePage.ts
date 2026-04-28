@@ -1,29 +1,42 @@
+import { Page, Locator } from '@playwright/test';
+import { WIKI_TARGET as TARGET } from '../target';
+
 /**
- * Page Object Model for a Wikipedia article page.
+ * Page object for a Wikipedia article. Mirrors the conventions of
+ * [BookingPage](../../cal-com/pages/BookingPage.ts):
  *
- * Companion to the cal.com `BookingPage` POM, but with no data-testid
- * dependencies — every locator is either a semantic role or a stable
- * Wikipedia-internal element id. This makes the pack a reference for users
- * whose own apps don't ship with a testid scaffold.
+ *   - public `readonly page` for direct test access when needed
+ *   - every locator initialised in the constructor (no per-call lookups)
+ *   - getters reserved for composed / multi-strategy locators
+ *   - a single `goto()` that reads the URL from the target pack
+ *
+ * Wikipedia ships no `data-testid` attributes, so locators are either
+ * stable element ids or ARIA roles — making this a useful reference for
+ * users adapting the toolkit to apps that don't have a testid scaffold.
  */
-import type { Page, Locator, Response } from '@playwright/test';
+export const DEFAULT_ARTICLE_URL = TARGET.bookingUrl;
 
 export class ArticlePage {
-  constructor(private readonly page: Page) {}
-
-  /** Navigate to a fully-qualified article URL. */
-  goto(url: string): Promise<Response | null> {
-    return this.page.goto(url, { waitUntil: 'domcontentloaded' });
-  }
+  readonly page: Page;
 
   /** Top-level article heading (`<h1 id="firstHeading">`). */
-  get title(): Locator {
-    return this.page.locator('h1#firstHeading');
-  }
+  readonly title: Locator;
 
   /** First paragraph of body copy — sanity check that content rendered. */
-  get firstParagraph(): Locator {
-    return this.page.locator('#mw-content-text p').first();
+  readonly firstParagraph: Locator;
+
+  /** Global search input — accessible by role on every Wikipedia page. */
+  readonly searchInput: Locator;
+
+  /** Footer "this page was last edited on …" line. */
+  readonly lastModified: Locator;
+
+  constructor(page: Page) {
+    this.page = page;
+    this.title = page.locator('h1#firstHeading');
+    this.firstParagraph = page.locator('#mw-content-text p').first();
+    this.searchInput = page.getByRole('searchbox', { name: /search/i }).first();
+    this.lastModified = page.locator('#footer-info-lastmod');
   }
 
   /**
@@ -47,13 +60,15 @@ export class ArticlePage {
       .first();
   }
 
-  /** Global search input — accessible by role on every Wikipedia page. */
-  get searchInput(): Locator {
-    return this.page.getByRole('searchbox', { name: /search/i }).first();
+  /**
+   * Section anchors inside the table of contents — real `#section` links,
+   * excluding Wikipedia's "(Top)" entry which is rendered as `href="#"`.
+   */
+  get tocSectionLinks(): Locator {
+    return this.tableOfContents.locator('a[href^="#"]:not([href="#"])');
   }
 
-  /** Footer "this page was last edited on …" line. */
-  get lastModified(): Locator {
-    return this.page.locator('#footer-info-lastmod');
+  async goto(url: string = DEFAULT_ARTICLE_URL): Promise<void> {
+    await this.page.goto(url, { waitUntil: 'domcontentloaded' });
   }
 }

@@ -74,36 +74,14 @@ export const WIKI_CHECKS_PATH = path.join(__dirname, 'qa-checks.json');
  * timestamp. A discrepancy would indicate a CDN or rollout bug.
  */
 export function wikiChecks(): Check[] {
+  const renders = [
+    { name: 'Desktop Article', url: WIKI_TARGET.bookingUrl },
+    { name: 'Mobile Article', url: WIKI_TARGET.profileUrl },
+  ];
+  const pagesFor = (description: string) => renders.map(r => ({ ...r, description }));
+
   return [
-    {
-      key: 'article title',
-      pages: [
-        {
-          name: 'Desktop Article',
-          url: WIKI_TARGET.bookingUrl,
-          description: 'Desktop render of the article',
-        },
-        {
-          name: 'Mobile Article',
-          url: WIKI_TARGET.profileUrl,
-          description: 'Mobile render of the same article',
-        },
-      ],
-    },
-    {
-      key: 'last modified date',
-      pages: [
-        {
-          name: 'Desktop Article',
-          url: WIKI_TARGET.bookingUrl,
-          description: 'Footer "last edited" timestamp on desktop',
-        },
-        {
-          name: 'Mobile Article',
-          url: WIKI_TARGET.profileUrl,
-          description: 'Footer "last edited" timestamp on mobile',
-        },
-      ],
-    },
+    { key: 'article title', pages: pagesFor('Article title rendering') },
+    { key: 'last modified date', pages: pagesFor('Footer last-edited timestamp') },
   ];
 }
