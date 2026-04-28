@@ -196,20 +196,56 @@ export function buildGenerateTestsPrompt(
 }
 
 /**
- * Runs `tsc --noEmit` against a single file. Returns ok=false plus diagnostic
- * output if the file fails to typecheck. Used to gate AI-generated tests
- * before declaring them "saved".
+ * Runs `tsc --noEmit` against a single file using the workspace tsconfig.
+ *
+ * Implementation note: passing a file path directly to `tsc` makes it
+ * ignore tsconfig.json entirely, which means `@playwright/test` and other
+ * `node_modules` imports fail to resolve. We work around that by writing
+ * a tiny temporary tsconfig that `extends` the workspace config and lists
+ * only the target file under `include`, then invoking `tsc -p <temp>`.
+ * Returns ok=false plus diagnostic output if the file fails to typecheck.
  */
 export function typecheckFile(filePath: string): { ok: boolean; output: string } {
-  const result = spawnSync(
-    'npx',
-    ['tsc', '--noEmit', '--skipLibCheck', '--esModuleInterop', '--target', 'es2020', filePath],
-    { stdio: 'pipe', shell: false, cwd: process.cwd() }
+  const cwd = process.cwd();
+  const workspaceConfig = path.join(cwd, 'tsconfig.json');
+  const tempConfigPath = path.join(
+    cwd,
+    `tsconfig.typecheck-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`
   );
-  return {
-    ok: result.status === 0,
-    output: (result.stdout?.toString() ?? '') + (result.stderr?.toString() ?? ''),
-  };
+  const useWorkspaceConfig = fs.existsSync(workspaceConfig);
+
+  if (useWorkspaceConfig) {
+    fs.writeFileSync(
+      tempConfigPath,
+      JSON.stringify(
+        {
+          extends: './tsconfig.json',
+          include: [path.relative(cwd, filePath)],
+          // Override workspace `include` (which would pull in every .ts file)
+          // by also clearing files. tsc treats include=[file] + files=[]
+          // as "only this file".
+          files: [],
+        },
+        null,
+        2
+      )
+    );
+  }
+
+  try {
+    const args = useWorkspaceConfig
+      ? ['tsc', '--noEmit', '-p', tempConfigPath]
+      : ['tsc', '--noEmit', '--skipLibCheck', '--esModuleInterop', '--target', 'es2020', filePath];
+    const result = spawnSync('npx', args, { stdio: 'pipe', shell: false, cwd });
+    return {
+      ok: result.status === 0,
+      output: (result.stdout?.toString() ?? '') + (result.stderr?.toString() ?? ''),
+    };
+  } finally {
+    if (useWorkspaceConfig && fs.existsSync(tempConfigPath)) {
+      fs.unlinkSync(tempConfigPath);
+    }
+  }
 }
 
 /**

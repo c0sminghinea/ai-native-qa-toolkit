@@ -19,13 +19,19 @@ import { generateTests } from '../../ai-tools/generate-tests';
 
 const FIXTURE_HTML = fs.readFileSync(path.join(__dirname, 'fixtures', 'healer-page.html'), 'utf-8');
 
-// Self-contained TS so the orchestrator's standalone `tsc --noEmit` (which
-// does NOT pick up the workspace tsconfig because it's invoked with an
-// explicit file argument) succeeds without resolving @playwright/test.
-const VALID_SPEC = `// Generated test placeholder
-const heading: string = 'Welcome';
-const cta: string = 'checkout-cta';
-export { heading, cta };
+// A real Playwright spec — verifies that `typecheckFile` correctly resolves
+// `@playwright/test` from `node_modules` via the workspace tsconfig.
+const VALID_SPEC = `import { test, expect } from '@playwright/test';
+
+test('renders heading', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('h1')).toBeVisible();
+});
+
+test('renders the primary CTA', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('checkout-cta')).toBeVisible();
+});
 `;
 
 describe('generate-tests integration (mocked LLM)', () => {
@@ -79,6 +85,6 @@ describe('generate-tests integration (mocked LLM)', () => {
     expect(envelope.bytes).toBeGreaterThan(50);
 
     expect(fs.existsSync(outputPath)).toBe(true);
-    expect(fs.readFileSync(outputPath, 'utf-8')).toContain('checkout-cta');
+    expect(fs.readFileSync(outputPath, 'utf-8')).toContain('@playwright/test');
   }, 120_000);
 });
