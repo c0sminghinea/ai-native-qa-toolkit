@@ -28,7 +28,9 @@ These invariants are enforced via review and CI:
 
 1. **Toolkit core is target-agnostic.** Modules under `ai-tools/` MUST NOT
    import from `tests/examples/`. Target-specific configuration is loaded at
-   runtime from path-based fallback files.
+   runtime from path-based fallback files. **Enforced by ESLint** via a
+   `no-restricted-imports` rule scoped to `ai-tools/**` — see
+   [eslint.config.mjs](../eslint.config.mjs).
 2. **Pure helpers are exported and tested.** Every tool extracts its prompt
    builders, parsers, classifiers, and validators into pure functions covered
    by `tests-unit/`. Browser and LLM tails stay uncovered by design.

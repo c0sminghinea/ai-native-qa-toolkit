@@ -26,4 +26,25 @@ export default [
       'no-console': 'off',
     },
   },
+  // Architectural invariant: the toolkit core (ai-tools/**) is target-agnostic
+  // and MUST NOT depend on any bundled example pack. Example packs live under
+  // tests/examples/** and import FROM ai-tools, never the other way around.
+  // See docs/architecture.md ("Architectural Invariants").
+  {
+    files: ['ai-tools/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/tests/examples/**', '../tests/examples/**', '../../tests/examples/**'],
+              message:
+                'ai-tools/** must not import from tests/examples/**. The toolkit core is target-agnostic — example packs depend on the toolkit, not the other way around. See docs/architecture.md.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 ];

@@ -8,6 +8,12 @@ project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- ESLint enforcement of the **toolkit-core target-agnostic invariant**:
+  `no-restricted-imports` rule scoped to `ai-tools/**` blocks any import
+  from `tests/examples/**`, with a message pointing to
+  [docs/architecture.md](docs/architecture.md). Backed by a programmatic
+  regression test in [tests-unit/eslint-invariants.test.ts](tests-unit/eslint-invariants.test.ts)
+  so the rule itself can't be silently weakened.
 - Second example target pack: [tests/examples/wikipedia/](tests/examples/wikipedia)
   — a non-scheduling target with no `data-testid` scaffold, used to validate
   that the target-pack abstraction is genuinely target-shape-agnostic.
