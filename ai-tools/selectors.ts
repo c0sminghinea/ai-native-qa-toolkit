@@ -24,8 +24,6 @@ import * as path from 'path';
 // any particular role exists. Tools must guard `SELECTORS.X` with an
 // `if (X)` check before using it.
 
-export type SelectorKey = string;
-
 /**
  * Loads `selectors.json` from the workspace root. When the file is absent,
  * falls back to `tests/examples/cal-com/selectors.json` so the bundled demo

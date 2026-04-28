@@ -253,26 +253,6 @@ export class Logger {
   }
 }
 
-/**
- * Prints a structured result. When `flags.json` is true, emits a single JSON
- * line on stdout; otherwise emits the human-readable `humanText` (unless
- * `flags.quiet`). Returns the exit code suggested by `findings` if any.
- */
-export interface ToolResult {
-  ok: boolean;
-  findings?: number;
-  reportPath?: string;
-  data?: Record<string, unknown>;
-}
-
-export function emitResult(flags: CliFlags, result: ToolResult, humanText?: string): void {
-  if (flags.json) {
-    process.stdout.write(JSON.stringify(result) + '\n');
-  } else if (humanText && !flags.quiet) {
-    console.log(humanText);
-  }
-}
-
 // ---------------------------------------------------------------------------
 // File / spec helpers shared between CLI tools and the MCP server.
 // ---------------------------------------------------------------------------

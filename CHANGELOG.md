@@ -6,6 +6,14 @@ project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Removed
+
+- Dead exports identified via `ts-prune` audit:
+  - `emitResult` and `ToolResult` in [ai-tools/tool-utils.ts](ai-tools/tool-utils.ts) — never called by any tool or test.
+  - `SelectorKey` in [ai-tools/selectors.ts](ai-tools/selectors.ts) — useless `type X = string` alias with no consumers.
+  - `WikiSelectorKey` in [tests/examples/wikipedia/target.ts](tests/examples/wikipedia/target.ts) — never imported.
+  - `CAL_COM_ROLE_DESCRIPTIONS` and `CalComSelectorKey` in [tests/examples/cal-com/target.ts](tests/examples/cal-com/target.ts) — replaced by [tests/examples/cal-com/roles.json](tests/examples/cal-com/roles.json) (which `loadRoleDescriptions` actually reads); the TS const had been orphaned.
+
 ### Added
 
 - Integration test layer under [tests-unit/integration/](tests-unit/integration)

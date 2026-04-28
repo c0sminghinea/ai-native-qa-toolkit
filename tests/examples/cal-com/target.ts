@@ -35,30 +35,6 @@ export const CAL_COM_SELECTORS = {
   TIME: 'time',
 } as const;
 
-export type CalComSelectorKey = keyof typeof CAL_COM_SELECTORS;
-
-/**
- * Human-readable description of each role, consumed by `discover-selectors`
- * when asking the LLM to map roles to live testids on a target page.
- * Descriptions are intentionally semantic — they describe what the element
- * does, not what cal.com calls it.
- */
-export const CAL_COM_ROLE_DESCRIPTIONS: Record<CalComSelectorKey, string> = {
-  BOOKER_CONTAINER:
-    'The outer wrapper element that contains the entire booking widget (calendar + time slots).',
-  EVENT_TITLE: 'The element showing the title of the event being booked (e.g. "30 Min Meeting").',
-  EVENT_META:
-    'The element showing event metadata such as duration, location, or description, near the title.',
-  MONTH_LABEL: 'The text element displaying the currently visible month, e.g. "October 2025".',
-  PREV_MONTH: 'The button that navigates the calendar to the previous month.',
-  NEXT_MONTH: 'The button that navigates the calendar to the next month.',
-  TIMEZONE_SELECT: 'The control (button or select) that lets the user change their timezone.',
-  OVERLAY_CALENDAR_SWITCH:
-    "A toggle/switch for overlaying the user's personal calendar on top of availability.",
-  DAY: 'A single selectable day cell in the calendar grid.',
-  TIME: 'A single selectable time slot button shown after a day is picked.',
-};
-
 /** Booking path appended to BASE_URL. Override with `BOOKING_PATH` env var. */
 export const CAL_COM_BOOKING_PATH = process.env.BOOKING_PATH || '/bailey/chat';
 

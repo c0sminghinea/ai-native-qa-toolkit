@@ -43,8 +43,6 @@ export const WIKI_ARTICLE_PATH = process.env.WIKI_ARTICLE_PATH || '/wiki/Playwri
  */
 export const WIKI_SELECTORS = {} as const;
 
-export type WikiSelectorKey = keyof typeof WIKI_SELECTORS;
-
 /**
  * Wikipedia-shaped TARGET. The `bookingUrl` / `profileUrl` field names are
  * generic anchors retained for compatibility with the toolkit's existing
